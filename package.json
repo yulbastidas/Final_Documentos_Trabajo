@@ -1,0 +1,30 @@
+{
+  "name": "securedocs",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "check": "npm run check --workspaces",
+    "dev:frontend": "npm run dev -w frontend",
+    "dev:backend": "npm run start:dev -w backend",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "overrides": {
+    "multer": "2.5.0",
+    "js-yaml": "5.5.0",
+    "typeorm": {
+      "glob": "14.0.2"
+    }
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+frontend/.next/
+backend/dist/
+package-lock.json
+frontend/next-env.d.ts
+*.tsbuildinfo
+docs/inventario.md
+frontend/test-results/
+frontend/playwright-report/

@@ -1,0 +1,46 @@
+name: securedocs
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-securedocs}
+      MYSQL_USER: ${MYSQL_USER:-securedocs_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Completar MYSQL_PASSWORD en .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Completar MYSQL_ROOT_PASSWORD en .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping -h localhost -u root --silent',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/docker/backend.Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      FRONTEND_ORIGIN: http://localhost:3000
+      DB_ENABLED: 'true'
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${MYSQL_USER:-securedocs_app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Completar MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE:-securedocs}
+    ports: ['127.0.0.1:4000:4000']
+    depends_on:
+      mysql:
+        condition: service_healthy
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/docker/frontend.Dockerfile
+    ports: ['127.0.0.1:3000:3000']
+    depends_on: [backend]
+volumes:
+  mysql_data:
