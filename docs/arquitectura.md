@@ -11,9 +11,9 @@ El navegador presenta Next.js App Router + React + TypeScript + Tailwind. Consum
 | infra/, security/, .github/workflows/ | Jerónimo    | Entornos, Docker, proxy, análisis y laboratorios futuros                      |
 | docs/, archivos raíz y lockfile       | Equipo      | Cambios coordinados y revisión cruzada                                        |
 
-Módulos previstos: identidad, usuarios, roles/permisos, MFA, documentos/versiones, criptografía/integridad, auditoría y reportes. Solo health existe hoy. Evitar módulos vacíos que sugieran funcionalidades terminadas.
+Módulos implementados en dev/jacobo (pendientes de integración): identidad y sesión, MFA, usuarios, roles/permisos, documentos, criptografía/integridad, auditoría, reportes y salud. Versiones documentales no existen todavía. Detalle en entrega-jacobo.md.
 
-TypeORM está preparado con MySQL, sin entidades, sin synchronize ni dropSchema. DB_ENABLED=false permite iniciar la API sin base de datos; health mide vida del proceso, no disponibilidad de MySQL. DB_ENABLED=true exige contraseña. Jacobo definirá migraciones antes de agregar tablas.
+TypeORM con MySQL: 7 entidades creadas solo por migraciones (backend/src/database/migrations), sin synchronize, dropSchema ni migrationsRun. DB_ENABLED=false inicia la API solo con salud; /health mide vida del proceso y /health/ready la disponibilidad de MySQL y del almacenamiento. DB_ENABLED=true exige contraseña y claves. Los documentos cifrados se guardan en STORAGE_DIR, fuera de directorios públicos.
 
 Convenciones: carpetas y archivos kebab-case; componentes y clases PascalCase; funciones/variables camelCase; variables de entorno SCREAMING_SNAKE_CASE; tablas snake_case plural; UUID como identificador público futuro; timestamps ISO 8601 UTC. Código TypeScript estricto, documentación en español, API en inglés. Componentes reutilizables en frontend/src/components, páginas en frontend/src/app; módulos backend en backend/src/<modulo>.
 

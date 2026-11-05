@@ -2,7 +2,7 @@
 
 Sistema de Gestión Documental Segura — Sistemas de Comunicación y Seguridad Informática.
 
-**Estado: base de Fase 0 + frontend de demostración de Yuly para las fases 1–6.** Incluye formularios, panel documental, roles visuales, auditoría sintética, reportes y guía de laboratorios. La API sigue limitada a salud: no hay autenticación, cifrado ni documentos reales. El README original sin extensión permanece intacto. Las fases del sistema requieren integración y aceptación conjunta.
+**Estado: base de Fase 0 + frontend de demostración de Yuly para las fases 1–6.** Incluye formularios, panel documental, roles visuales, auditoría sintética, reportes y guía de laboratorios. Backend de Jacobo en dev/jacobo (contrato v0.1.0, pendiente de integración): registro, sesión con cookie HttpOnly y CSRF, MFA TOTP, roles y permisos por documento, documentos cifrados AES-256-GCM, auditoría y reportes. Ver [entrega de Jacobo](docs/entrega-jacobo.md). El README original sin extensión permanece intacto. Las fases del sistema requieren integración y aceptación conjunta.
 
 ## Inicio local
 
@@ -38,6 +38,8 @@ No usar down -v si se desea conservar MySQL. Son imágenes de desarrollo, sin TL
 
 - [Frontend: rutas, pruebas y ejecución](frontend/README.md)
 - [Entrega de Yuly y dependencias de integración](docs/entrega-yuly.md)
+- [Backend: ejecución, migraciones y pruebas](backend/README.md)
+- [Entrega de Jacobo: decisiones, pruebas y guía de integración](docs/entrega-jacobo.md)
 
 - [Arquitectura y responsables](docs/arquitectura.md)
 - [Contrato API](docs/api.md)
