@@ -61,6 +61,49 @@ jobs:
       - name: Construir imagen de API
         run: docker build --pull -f infra/docker/backend.Dockerfile -t securedocs-backend:ci .
 
+      - name: Construir imagen de frontend
+        run: docker build --pull -f infra/docker/frontend.Dockerfile -t securedocs-frontend:ci .
+
+      - name: Preparar directorio de informes Trivy
+        run: mkdir -p trivy-results
+
+      - name: Generar informe Trivy JSON de API
+        id: trivy-report-api
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: securedocs-backend:ci
+          scanners: vuln
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          format: json
+          output: trivy-results/api.json
+          exit-code: "0"
+
+      - name: Generar informe Trivy JSON de frontend
+        id: trivy-report-frontend
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: securedocs-frontend:ci
+          scanners: vuln
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          format: json
+          output: trivy-results/frontend.json
+          exit-code: "0"
+
+      - name: Publicar informes de vulnerabilidades Trivy
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: trivy-image-reports
+          path: trivy-results/*.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Escanear imagen de API
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -71,9 +114,6 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
-
-      - name: Construir imagen de frontend
-        run: docker build --pull -f infra/docker/frontend.Dockerfile -t securedocs-frontend:ci .
 
       - name: Escanear imagen de frontend
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
