@@ -22,7 +22,8 @@
     "js-yaml": "5.5.0",
     "typeorm": {
       "glob": "14.0.2"
-    }
+    },
+    "undici": "6.29.1"
   },
   "devDependencies": {
     "prettier": "3.9.10"
