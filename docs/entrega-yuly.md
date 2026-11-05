@@ -2,6 +2,10 @@
 
 Esta entrega amplía la base de Fase 0 por instrucción de Yuly. Implementa interfaces y flujos de demostración para las fases 1–6. **No declara terminadas las fases del sistema**, que requieren backend, infraestructura e integración del equipo. El contrato de API existente no fue cambiado ni se asume aprobado por los compañeros.
 
+## Estado actualizado de integración
+
+Este documento conserva el alcance original de la entrega de UI. Desde entonces, el backend v0.1.0 quedó integrado en `developer` y Jerónimo preparó Compose/Nginx en `dev/jeronimo`. La interfaz continúa en modo demostración salvo la consulta de salud. Para integrar sesiones, MFA y datos reales, usa [API v0.1.0](api.md) y la [guía de integración frontend–backend](integracion-frontend-backend.md); las instrucciones históricas de abajo que describen el contrato como pendiente deben leerse como contexto de la fecha de esta entrega.
+
 ## Alcance por fase
 
 | Fase | Trabajo frontend incluido                                                                                                                                                | Integración pendiente                                                                           |

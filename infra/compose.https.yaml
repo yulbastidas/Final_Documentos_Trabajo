@@ -1,0 +1,14 @@
+services:
+  backend:
+    environment:
+      FRONTEND_ORIGIN: ${PUBLIC_ORIGIN:?Definir PUBLIC_ORIGIN con https:// y el host público}
+      NODE_ENV: production
+      COOKIE_SECURE: "true"
+
+  nginx:
+    ports: !override
+      - "127.0.0.1:80:8080"
+      - "127.0.0.1:443:8443"
+    volumes: !override
+      - ./nginx/https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./tls:/etc/nginx/tls:ro

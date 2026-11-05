@@ -1,6 +1,6 @@
 # Inventario actual de SecureDocs
 
-Base de Fase 0 y entrega frontend de Yuly. El README original sin extensión permanece intacto. backend/, infra/, security/ y workflows no fueron modificados en esta entrega de frontend. El contrato API no cambió.
+Este inventario describe la base entregada antes de las incorporaciones de backend e infraestructura. Para el estado más reciente, consulta [entrega de Jacobo](entrega-jacobo.md), [entrega de Jerónimo](entrega-jeronimo.md) y `rg --files`. El README original sin extensión permanece intacto.
 
 Se muestran todos los archivos fuente; se omiten dependencias, builds, resultados de pruebas y archivos de entorno privados.
 

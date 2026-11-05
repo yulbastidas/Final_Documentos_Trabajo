@@ -23,6 +23,8 @@ export const envValidationSchema = Joi.object({
     then: Joi.string().required(),
     otherwise: Joi.string().allow('').optional(),
   }),
+  // El entrypoint de la imagen resuelve este secreto antes de iniciar Node.
+  DB_PASSWORD_FILE: Joi.string().allow('').optional(),
 
   REGISTRATION_MODE: Joi.string().valid('open', 'closed').default('open'),
   SESSION_IDLE_MINUTES: Joi.number().integer().min(1).max(240).default(30),

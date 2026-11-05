@@ -13,6 +13,8 @@ npm run dev:frontend
 
 Abrir http://localhost:3000 . No hace falta iniciar MySQL ni backend para explorar la interfaz. El botón «Comprobar API» sí consulta el endpoint de salud real cuando el backend está disponible; `NEXT_PUBLIC_API_URL` se configura en frontend/.env.local siguiendo .env.example.
 
+Para conectar módulos reales, ejecutar el stack de Compose por el origen único de Nginx (`http://localhost:8080`) y seguir la [guía de integración frontend–backend](../docs/integracion-frontend-backend.md). La compilación de Compose incorpora `PUBLIC_ORIGIN` en `NEXT_PUBLIC_API_URL`; reconstruir frontend al cambiarlo. La integración de autenticación y las operaciones del panel aún están pendientes.
+
 ## Rutas
 
 | Ruta                               | Interfaz                                                                                                                            |

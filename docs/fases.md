@@ -1,6 +1,6 @@
 # Plan y criterios de aceptación
 
-La Fase 0 quedó inicializada. Por instrucción de Yuly se amplió exclusivamente el frontend con interfaces de demostración de las fases 1–6; ver entrega-yuly.md. Los criterios globales de esta tabla siguen pendientes de backend, infraestructura e integración. La implementación dependiente requiere revisar main y acordar contratos con el equipo.
+La base de Fase 0 y las entregas de Yuly, Jacobo y Jerónimo están en `developer`. El backend, Compose, proxy local, workflows y guías de laboratorios ya tienen implementación. La integración visual del backend, la validación completa de Docker/HTTPS y la aceptación conjunta siguen pendientes; ver las entregas individuales. Estos archivos no activan reglas de protección de ramas en GitHub.
 
 | Fase | Alcance previsto                                                             | Criterios de aceptación                                                                                                                                                                           |
 | ---- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

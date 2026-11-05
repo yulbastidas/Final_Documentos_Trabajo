@@ -1,0 +1,87 @@
+name: CI y seguridad
+
+on:
+  push:
+    branches: [developer, main, "dev/**"]
+  pull_request:
+    branches: [developer, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: securedocs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks-and-scan:
+    name: Compilar, comprobar y escanear
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Instalar dependencias bloqueadas
+        run: npm ci
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Comprobar tipos
+        run: npm run check
+
+      - name: Pruebas unitarias
+        run: |
+          npm run test:unit -w frontend
+          npm run test:unit -w backend
+
+      - name: Revisar vulnerabilidades de npm
+        run: npm audit --audit-level=high
+
+      - name: Escanear archivos y configuración con Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Construir imagen de API
+        run: docker build --pull -f infra/docker/backend.Dockerfile -t securedocs-backend:ci .
+
+      - name: Escanear imagen de API
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: securedocs-backend:ci
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Construir imagen de frontend
+        run: docker build --pull -f infra/docker/frontend.Dockerfile -t securedocs-frontend:ci .
+
+      - name: Escanear imagen de frontend
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: securedocs-frontend:ci
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

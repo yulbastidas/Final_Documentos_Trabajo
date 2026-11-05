@@ -1,8 +1,8 @@
 # Contrato API — v0.1.0
 
-Base local: http://localhost:4000/api/v1 . JSON UTF-8 salvo carga (multipart) y descarga (binario). Swagger de desarrollo: /api/docs; documento generado: /api/docs-json (fuente de verdad de los esquemas). Fechas ISO 8601 UTC; identificadores UUID v4.
+Base directa local: http://localhost:4000/api/v1 . Por Compose, el origen único es http://localhost:8080/api/v1. JSON UTF-8 salvo carga (multipart) y descarga (binario). Swagger de desarrollo: /api/docs; documento generado: /api/docs-json (fuente de verdad de los esquemas). Fechas ISO 8601 UTC; identificadores UUID v4.
 
-**Estado: implementado por Jacobo en dev/jacobo y probado (ver docs/entrega-jacobo.md). Pendiente de revisión por Yuly (consumo desde frontend) y Jerónimo (despliegue/seguridad) antes del PR a developer.** Las decisiones marcadas «A ACORDAR» son propuestas con valor por defecto ya implementado; cambiarlas es barato mientras no haya clientes conectados.
+**Estado: implementado por Jacobo, integrado en developer y probado (ver docs/entrega-jacobo.md).** Yuly aún debe conectar el frontend demostrativo y Jerónimo validar el despliegue con contenedores/HTTPS. Las decisiones marcadas «A ACORDAR» son propuestas con valor por defecto ya implementado; cambiarlas es barato mientras no haya clientes conectados.
 
 ## Sesión, cookies y CSRF
 
