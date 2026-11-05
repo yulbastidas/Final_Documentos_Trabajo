@@ -1,0 +1,162 @@
+name: CI y seguridad
+
+on:
+  push:
+    branches: [developer, main, "dev/**"]
+  pull_request:
+    branches: [developer, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: securedocs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks-and-scan:
+    name: Compilar, comprobar y escanear
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Instalar dependencias bloqueadas
+        run: npm ci
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Comprobar tipos
+        run: npm run check
+
+      - name: Pruebas unitarias
+        run: |
+          npm run test:unit -w frontend
+          npm run test:unit -w backend
+
+      - name: Revisar vulnerabilidades de npm
+        run: npm audit --audit-level=high
+
+      - name: Escanear archivos y configuración con Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Construir imagen de API
+        run: docker build --pull -f infra/docker/backend.Dockerfile -t securedocs-backend:ci .
+
+      - name: Construir imagen de frontend
+        run: docker build --pull -f infra/docker/frontend.Dockerfile -t securedocs-frontend:ci .
+
+      - name: Preparar directorio de informes Trivy
+        run: mkdir -p trivy-results
+
+      - name: Generar informe Trivy JSON de API
+        id: trivy-report-api
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: securedocs-backend:ci
+          scanners: vuln
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          format: json
+          output: trivy-results/api.json
+          exit-code: "0"
+
+      - name: Generar informe Trivy JSON de frontend
+        id: trivy-report-frontend
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: securedocs-frontend:ci
+          scanners: vuln
+          vuln-type: os,library
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          format: json
+          output: trivy-results/frontend.json
+          exit-code: "0"
+
+      - name: Anotar hallazgos detallados de Trivy
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          reports=(trivy-results/*.json)
+          if ((${#reports[@]} == 0)); then
+            echo "No se generaron informes Trivy para anotar."
+            exit 0
+          fi
+
+          for report in "${reports[@]}"; do
+            image="${report##*/}"
+            image="${image%.json}"
+            jq -r --arg image "$image" '
+              .Results[]? as $result |
+              $result.Vulnerabilities[]? |
+              {
+                image: $image,
+                target: $result.Target,
+                package_type: ($result.Class // $result.Type),
+                distro: $result.Type,
+                package: .PkgName,
+                installed: .InstalledVersion,
+                fixed: .FixedVersion,
+                cve: .VulnerabilityID,
+                severity: .Severity,
+                dependency: .PkgIdentifier.PURL,
+                path: .PkgPath
+              } | tojson | gsub("%"; "%25") | gsub("\\r"; "%0D") | gsub("\\n"; "%0A")
+            ' "$report" | while IFS= read -r finding; do
+              printf '::notice title=Trivy finding::%s\n' "$finding"
+            done
+          done
+
+      - name: Publicar informes de vulnerabilidades Trivy
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: trivy-image-reports
+          path: trivy-results/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Escanear imagen de API
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: securedocs-backend:ci
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Escanear imagen de frontend
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: securedocs-frontend:ci
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

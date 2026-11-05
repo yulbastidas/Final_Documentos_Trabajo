@@ -1,46 +1,198 @@
 name: securedocs
+
 services:
   mysql:
     image: mysql:8.4
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-securedocs}
       MYSQL_USER: ${MYSQL_USER:-securedocs_app}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Completar MYSQL_PASSWORD en .env}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Completar MYSQL_ROOT_PASSWORD en .env}
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    secrets:
+      - mysql_password
+      - mysql_root_password
     volumes:
       - mysql_data:/var/lib/mysql
+    networks: [securedocs]
     healthcheck:
       test:
         [
           CMD-SHELL,
-          'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping -h localhost -u root --silent',
+          'MYSQL_PWD="$$(cat /run/secrets/mysql_root_password)" mysqladmin ping -h 127.0.0.1 -u root --silent',
         ]
       interval: 10s
       timeout: 5s
       retries: 15
-  backend:
+      start_period: 30s
+    security_opt: [no-new-privileges:true]
+
+  storage-init:
+    image: securedocs-backend:local
     build:
       context: ..
       dockerfile: infra/docker/backend.Dockerfile
+    user: "0:0"
+    command:
+      [
+        /bin/sh,
+        -c,
+        'install -d -m 0700 -o 1000 -g 1000 /var/lib/securedocs/documents',
+      ]
+    volumes:
+      - document_data:/var/lib/securedocs/documents
+    networks: [securedocs]
+    restart: "no"
+    security_opt: [no-new-privileges:true]
+
+  migrate:
+    image: securedocs-backend:local
+    build:
+      context: ..
+      dockerfile: infra/docker/backend.Dockerfile
+    working_dir: /app
+    command: [npm, run, migration:run:prod, -w, backend]
     environment:
-      NODE_ENV: development
-      PORT: 4000
-      FRONTEND_ORIGIN: http://localhost:3000
-      DB_ENABLED: 'true'
+      NODE_ENV: production
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: ${MYSQL_USER:-securedocs_app}
-      DB_PASSWORD: ${MYSQL_PASSWORD:?Completar MYSQL_PASSWORD}
       DB_NAME: ${MYSQL_DATABASE:-securedocs}
-    ports: ['127.0.0.1:4000:4000']
+      DB_PASSWORD_FILE: /run/secrets/mysql_password
+    secrets:
+      - mysql_password
     depends_on:
       mysql:
         condition: service_healthy
+    networks: [securedocs]
+    restart: "no"
+    security_opt: [no-new-privileges:true]
+
+  backend:
+    image: securedocs-backend:local
+    build:
+      context: ..
+      dockerfile: infra/docker/backend.Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      FRONTEND_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
+      TRUST_PROXY: 1
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DB_ENABLED: "true"
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${MYSQL_USER:-securedocs_app}
+      DB_NAME: ${MYSQL_DATABASE:-securedocs}
+      DB_PASSWORD_FILE: /run/secrets/mysql_password
+      DOCUMENT_KEK_ID: ${DOCUMENT_KEK_ID:-k1}
+      DOCUMENT_KEK_FILE: /run/secrets/document_kek
+      MFA_ENCRYPTION_KEY_FILE: /run/secrets/mfa_encryption_key
+      CSRF_SECRET_FILE: /run/secrets/csrf_secret
+      STORAGE_DIR: /var/lib/securedocs/documents
+    secrets:
+      - mysql_password
+      - document_kek
+      - mfa_encryption_key
+      - csrf_secret
+    volumes:
+      - document_data:/var/lib/securedocs/documents
+    networks: [securedocs]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+
   frontend:
+    image: securedocs-frontend:local
     build:
       context: ..
       dockerfile: infra/docker/frontend.Dockerfile
-    ports: ['127.0.0.1:3000:3000']
-    depends_on: [backend]
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_ORIGIN:-http://localhost:8080}/api/v1
+    restart: unless-stopped
+    networks: [securedocs]
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /app/frontend/.next/cache:rw,noexec,nosuid,size=64m
+
+  nginx:
+    image: nginxinc/nginx-unprivileged:1.29-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [securedocs]
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m
+
+networks:
+  securedocs:
+    name: securedocs-internal
+    driver: bridge
+    internal: true
+
 volumes:
   mysql_data:
+  document_data:
+
+secrets:
+  mysql_password:
+    file: ../.secrets/mysql_password
+  mysql_root_password:
+    file: ../.secrets/mysql_root_password
+  document_kek:
+    file: ../.secrets/document_kek
+  mfa_encryption_key:
+    file: ../.secrets/mfa_encryption_key
+  csrf_secret:
+    file: ../.secrets/csrf_secret

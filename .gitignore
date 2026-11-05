@@ -9,6 +9,8 @@ blob-report/
 .env
 .env.*
 !.env.example
+.secrets/
+infra/tls/
 *.log
 *.pem
 *.key

@@ -1,17 +1,17 @@
 # Arquitectura y responsabilidades
 
-Estado: Fase 0. La carpeta PROYECTO_FINAL es la raíz lógica `securedocs`; no se crea un directorio anidado. El archivo README vacío original se conserva.
+Estado: base de Fase 0 con entregas de frontend, backend e infraestructura local. La carpeta PROYECTO_FINAL es la raíz lógica `securedocs`; no se crea un directorio anidado. El archivo README vacío original se conserva.
 
-El navegador presenta Next.js App Router + React + TypeScript + Tailwind. Consumirá HTTP JSON de NestJS bajo /api/v1. NestJS será la única capa con acceso a MySQL mediante TypeORM. El navegador nunca accede a MySQL ni recibe claves privadas. Nginx/HTTPS se incorporará en Fase 3. El almacenamiento documental privado se definirá en Fase 2; no usar public/ para documentos confidenciales.
+El navegador presenta Next.js App Router + React + TypeScript + Tailwind. Consume HTTP JSON de NestJS bajo /api/v1. NestJS es la única capa con acceso a MySQL mediante TypeORM. El navegador nunca accede a MySQL ni recibe claves privadas. Compose incluye Nginx HTTP para desarrollo local y un override HTTPS con certificados externos; el despliegue público y la aceptación TLS siguen pendientes. Los documentos cifrados se guardan en un volumen privado fuera de directorios públicos.
 
 | Área                                  | Responsable | Alcance                                                                       |
 | ------------------------------------- | ----------- | ----------------------------------------------------------------------------- |
 | frontend/                             | Yuly        | Interfaz, componentes, responsive, accesibilidad, integración del contrato    |
 | backend/                              | Jacobo      | API modular, persistencia, autenticación, autorización y criptografía futuras |
-| infra/, security/, .github/workflows/ | Jerónimo    | Entornos, Docker, proxy, análisis y laboratorios futuros                      |
+| infra/, security/, .github/workflows/ | Jerónimo    | Entornos, Docker, proxy, CI/escaneos y guías de laboratorios                   |
 | docs/, archivos raíz y lockfile       | Equipo      | Cambios coordinados y revisión cruzada                                        |
 
-Módulos implementados en dev/jacobo (pendientes de integración): identidad y sesión, MFA, usuarios, roles/permisos, documentos, criptografía/integridad, auditoría, reportes y salud. Versiones documentales no existen todavía. Detalle en entrega-jacobo.md.
+Módulos de backend integrados en developer: identidad y sesión, MFA, usuarios, roles/permisos, documentos, criptografía/integridad, auditoría, reportes y salud. Detalle en entrega-jacobo.md. Compose prepara migraciones, secretos montados como archivos y almacenamiento privado.
 
 TypeORM con MySQL: 7 entidades creadas solo por migraciones (backend/src/database/migrations), sin synchronize, dropSchema ni migrationsRun. DB_ENABLED=false inicia la API solo con salud; /health mide vida del proceso y /health/ready la disponibilidad de MySQL y del almacenamiento. DB_ENABLED=true exige contraseña y claves. Los documentos cifrados se guardan en STORAGE_DIR, fuera de directorios públicos.
 
