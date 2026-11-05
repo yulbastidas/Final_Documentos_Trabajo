@@ -50,7 +50,7 @@ try {
   assert.deepEqual(await health.json(), {
     status: 'ok',
     service: 'securedocs-api',
-    version: '0.0.0',
+    version: '0.1.0',
   });
   const schema = await (
     await fetch('http://127.0.0.1:4100/api/docs-json')
@@ -61,7 +61,13 @@ try {
       .status,
     404,
   );
-  console.log('PASS API: salud, OpenAPI y ausencia de autenticación futura.');
+  assert.equal(
+    (await fetch('http://127.0.0.1:4100/api/v1/health/ready')).status,
+    503,
+  );
+  console.log(
+    'PASS API sin MySQL: salud, readiness 503, OpenAPI y rutas protegidas no montadas.',
+  );
   const production = launch(['dist/main.js'], 'backend', {
     PORT: '4101',
     DB_ENABLED: 'false',
