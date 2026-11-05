@@ -95,6 +95,41 @@ jobs:
           output: trivy-results/frontend.json
           exit-code: "0"
 
+      - name: Anotar hallazgos detallados de Trivy
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          reports=(trivy-results/*.json)
+          if ((${#reports[@]} == 0)); then
+            echo "No se generaron informes Trivy para anotar."
+            exit 0
+          fi
+
+          for report in "${reports[@]}"; do
+            image="${report##*/}"
+            image="${image%.json}"
+            jq -r --arg image "$image" '
+              .Results[]? as $result |
+              $result.Vulnerabilities[]? |
+              {
+                image: $image,
+                target: $result.Target,
+                package_type: ($result.Class // $result.Type),
+                distro: $result.Type,
+                package: .PkgName,
+                installed: .InstalledVersion,
+                fixed: .FixedVersion,
+                cve: .VulnerabilityID,
+                severity: .Severity,
+                dependency: .PkgIdentifier.PURL,
+                path: .PkgPath
+              } | tojson | gsub("%"; "%25") | gsub("\\r"; "%0D") | gsub("\\n"; "%0A")
+            ' "$report" | while IFS= read -r finding; do
+              printf '::notice title=Trivy finding::%s\n' "$finding"
+            done
+          done
+
       - name: Publicar informes de vulnerabilidades Trivy
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
