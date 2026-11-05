@@ -1,7 +1,6 @@
-FROM node:24-trixie-slim
-RUN apt-get update \
-    && apt-get upgrade -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:24-alpine3.24
+RUN apk -U upgrade \
+    && rm -rf /var/cache/apk/*
 WORKDIR /app
 COPY package*.json ./
 COPY frontend/package.json frontend/package.json
