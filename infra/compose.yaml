@@ -29,10 +29,8 @@ services:
 
   storage-init:
     image: securedocs-backend:local
-    build:
-      context: ..
-      dockerfile: infra/docker/backend.Dockerfile
-    user: "0:0"
+    pull_policy: never
+    user: '0:0'
     command:
       [
         /bin/sh,
@@ -42,16 +40,20 @@ services:
     volumes:
       - document_data:/var/lib/securedocs/documents
     networks: [securedocs]
-    restart: "no"
+    restart: 'no'
     security_opt: [no-new-privileges:true]
 
   migrate:
     image: securedocs-backend:local
-    build:
-      context: ..
-      dockerfile: infra/docker/backend.Dockerfile
-    working_dir: /app
-    command: [npm, run, migration:run:prod, -w, backend]
+    pull_policy: never
+    command:
+      [
+        node,
+        /app/node_modules/typeorm/cli.js,
+        -d,
+        dist/database/data-source.js,
+        migration:run,
+      ]
     environment:
       NODE_ENV: production
       DB_HOST: mysql
@@ -65,7 +67,7 @@ services:
       mysql:
         condition: service_healthy
     networks: [securedocs]
-    restart: "no"
+    restart: 'no'
     security_opt: [no-new-privileges:true]
 
   backend:
@@ -80,7 +82,7 @@ services:
       FRONTEND_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
       TRUST_PROXY: 1
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      DB_ENABLED: "true"
+      DB_ENABLED: 'true'
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: ${MYSQL_USER:-securedocs_app}
@@ -155,17 +157,17 @@ services:
     image: nginxinc/nginx-unprivileged:1.29-alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${HTTP_PORT:-8080}:8080"
+      - '127.0.0.1:${HTTP_PORT:-8080}:8080'
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    networks: [securedocs]
+    networks: [securedocs, ingress]
     depends_on:
       frontend:
         condition: service_healthy
       backend:
         condition: service_healthy
     healthcheck:
-      test: [CMD-SHELL, "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8080/healthz']
       interval: 20s
       timeout: 5s
       retries: 3
@@ -176,6 +178,8 @@ services:
       - /var/cache/nginx:rw,noexec,nosuid,size=16m
 
 networks:
+  ingress:
+    driver: bridge
   securedocs:
     name: securedocs-internal
     driver: bridge

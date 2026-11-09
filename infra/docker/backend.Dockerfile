@@ -13,7 +13,8 @@ RUN npm prune --omit=dev \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
     && mkdir -p /var/lib/securedocs/documents \
     && chown -R node:node /app/backend /var/lib/securedocs
-RUN chmod 0555 /usr/local/bin/securedocs-entrypoint
+RUN sed -i 's/\r$//' /usr/local/bin/securedocs-entrypoint \
+    && chmod 0555 /usr/local/bin/securedocs-entrypoint
 ENV NODE_ENV=production
 USER node
 WORKDIR /app/backend

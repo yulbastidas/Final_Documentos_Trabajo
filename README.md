@@ -2,7 +2,7 @@
 
 Sistema de Gestión Documental Segura — Sistemas de Comunicación y Seguridad Informática.
 
-**Estado: frontend de demostración, backend integrado y base de infraestructura local.** El backend implementa sesión, CSRF, MFA, autorización, documentos cifrados, auditoría y reportes bajo el contrato v0.1.0. El frontend conserva datos demostrativos salvo la consulta de salud. Compose coordina MySQL, migraciones, almacenamiento privado, API, frontend y Nginx; HTTPS se activa con un override y certificados externos. Ver [entrega de Jacobo](docs/entrega-jacobo.md) y [entrega de Jerónimo](docs/entrega-jeronimo.md). Las fases requieren aceptación conjunta; este Compose no es un despliegue de producción.
+**Estado: portal conectado al backend y entorno local con Compose.** En `/portal` se usan sesiones, MFA, documentos, usuarios, auditoría y reportes de la API v0.1.0. En `/dashboard` se conserva la demostración con datos ficticios. Compose coordina MySQL, migraciones, almacenamiento privado, API, frontend y Nginx. HTTPS local usa certificados externos. Ver [integración del portal](docs/integracion-frontend-backend.md), [entrega de Jacobo](docs/entrega-jacobo.md) y [entrega de Jerónimo](docs/entrega-jeronimo.md).
 
 ## Inicio local
 

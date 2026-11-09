@@ -35,7 +35,10 @@ export default function Home() {
               protección y trazabilidad.
             </p>
             <div className="mt-9 flex flex-wrap gap-4">
-              <Link className="button" href="/dashboard">
+              <Link className="button" href="/portal">
+                Abrir portal →
+              </Link>
+              <Link className="secondary-button" href="/dashboard">
                 Explorar demostración →
               </Link>
               <a

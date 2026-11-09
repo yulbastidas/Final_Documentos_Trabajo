@@ -1,6 +1,6 @@
 # Guía de integración frontend–backend
 
-Esta guía acompaña la infraestructura de `dev/jeronimo` y deja los puntos de conexión listos para que Yuly integre el frontend sin alterar el contrato API. El frontend sigue en modo demostración: solo `Comprobar API` hace una llamada real. Mantén el modo demo explícito hasta reemplazar las fuentes de datos y validar cada flujo contra el servidor.
+El portal conectado está en `/portal`. Su cliente HTTP consume API v0.1.0 con cookie de sesión y CSRF en memoria. El panel `/dashboard` conserva los ejemplos de demostración. El portal usa los permisos y datos devueltos por el servidor.
 
 ## Ejecutar el entorno para integración
 
@@ -38,13 +38,35 @@ La fuente de verdad es [API v0.1.0](api.md) y `/api/docs-json`. Usa un cliente H
 6. **Documentos:** carga multipart a `POST /documents` con `file`, `title`, `classification`; deja que el navegador genere el boundary de `FormData`. Acepta únicamente PDF/TXT UTF-8 de hasta 10 MiB. Para borrado, usa `permissions.canDelete`; un editor puede borrar documentos propios. Favoritos usan PUT/DELETE idempotentes. Descarga el binario desde `/documents/:id/download`, respeta `Content-Disposition` y no expongas el contenido en logs.
 7. **Administración:** datos reales de usuarios, auditoría y reportes son endpoints solo admin (`/users`, `/audit-events`, `/reports/summary`). Los permisos del cliente solo ocultan acciones; el servidor mantiene la autorización efectiva.
 
-## Secuencia de integración y aceptación
+## Integración verificada
 
-- [ ] Yuly confirma los puntos de UX que discrepan del contrato: editor borra lo propio, etiquetas de MFA, archivos permitidos y errores 401/403/429.
-- [ ] Mantener DemoProvider como modo de demostración explícito; crear adaptadores y servicios API aparte y no mezclar fixtures con datos reales en una misma vista.
-- [ ] Integrar sesión/login/MFA primero; después documentos; luego usuarios, auditoría y reportes. Agregar estados de carga, vacío, error, cancelación y expiración en cada módulo.
-- [ ] Probar el flujo con cuentas `example.test`, PDF/TXT sintéticos y Compose: registro, login, restauración de sesión, MFA opcional, CSRF, acceso denegado por rol/propiedad, límites de carga, descarga, logout y readiness.
-- [ ] Revisar que no haya credenciales en almacenamiento del navegador, console logs, capturas ni CSV. No presentar roles de UI como control de seguridad.
-- [ ] Actualizar [entrega de Yuly](entrega-yuly.md) con rutas reales integradas y resultados medidos antes del PR a `developer`.
+- Se actualizaron las referencias de GitHub y se usó `origin/main` como base de `dev/yuly`, porque allí están integrados Jacobo y Jerónimo. `origin/developer` contiene el backend de Jacobo y todavía no incorpora los commits de infraestructura.
+- El portal en `/portal` restaura sesiones y usa los permisos por usuario y documento de la API. El editor puede eliminar documentos propios si `canDelete` lo permite. Los datos de demostración viven aparte, en `/dashboard`.
+- Docker reutiliza una sola imagen para la API, las migraciones y la preparación del volumen. La migración usa el CLI de TypeORM mediante Node en la imagen final. El script de entrada normaliza los finales de línea para funcionar desde Windows.
+- Nginx tiene una red de entrada para publicar el puerto en loopback. MySQL, la API y el frontend quedan en la red interna. El endpoint de disponibilidad devolvió `database: up` y `storage: up` desde el host.
+- La prueba real en Chrome pasó con cuentas y un TXT sintéticos. Confirmó registro, sesión HttpOnly, restauración tras recargar, carga, favoritos, descarga con los mismos bytes, auditoría, reportes, permiso denegado al lector, eliminación y cierre de sesión. El navegador mantuvo vacíos localStorage y sessionStorage.
+- Una segunda prueba en Chrome confirmó el alta TOTP, el desafío al volver a iniciar sesión y el acceso con un código de recuperación.
+- Pasaron las comprobaciones de tipos, la compilación y las pruebas unitarias (40 del backend y 3 del frontend). Los 24 escenarios de la demostración pasaron contando la repetición de la prueba de rutas en escritorio, que había agotado el tiempo durante el arranque de Docker.
+- Los 37 escenarios de integración del backend quedaron aprobados entre la primera corrida y la repetición de la suite documental. La primera corrida aprobó 24 y agotó el tiempo al preparar la suite documental. Los 13 casos de esa suite pasaron al ejecutarla aisladamente.
 
-El contenedor Docker completo todavía requiere una corrida en un equipo con acceso al registry; el intento actual falló por DNS hacia `registry-1.docker.io`. La configuración de Compose sí pasó `config --quiet`; eso no sustituye la aceptación anterior.
+El perfil HTTPS se verificó localmente con un certificado temporal. Quedan el certificado del entorno de entrega y los laboratorios físicos. La auditoría npm de producción reportó 0 vulnerabilidades conocidas. La instalación completa con herramientas de desarrollo reportó 19 alertas (18 moderadas y 1 baja).
+
+## Crear el primer administrador local
+
+Con el entorno levantado, crea el usuario desde PowerShell. El registro en el portal crea cuentas lectoras.
+
+```powershell
+$env:ADMIN_EMAIL = 'admin@example.test'
+$env:ADMIN_PASSWORD = Read-Host 'Contraseña del administrador (mínimo 12 caracteres)' -MaskInput
+try {
+  docker compose --env-file .env -f infra/compose.yaml exec -T -e ADMIN_EMAIL -e ADMIN_PASSWORD backend /usr/local/bin/securedocs-entrypoint node dist/scripts/create-admin.js
+} finally {
+  Remove-Item Env:ADMIN_PASSWORD
+}
+```
+
+Entra por http://localhost:8080/portal. La configuración MFA permite añadir la clave manualmente a un autenticador TOTP. Conserva los códigos de recuperación en un lugar privado.
+
+## Prueba del portal contra la API real
+
+Con Chrome y las dependencias de desarrollo instaladas, crea un administrador sintético nuevo con el procedimiento anterior y ejecuta `node frontend/tests/integration/portal.mjs` dentro del bloque `try` antes de limpiar la contraseña. La prueba crea además una cuenta lectora sintética. Comprueba sesión y recarga, carga y descarga íntegra, favoritos, auditoría, reportes, acceso denegado y cierre de sesión.
