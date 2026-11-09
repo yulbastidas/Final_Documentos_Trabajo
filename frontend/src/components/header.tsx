@@ -10,8 +10,7 @@ export function Header() {
         className="flex gap-6 text-sm text-slate-300"
       >
         <Link href="/#arquitectura">Arquitectura</Link>
-        <Link href="/login">Acceso</Link>
-        <Link href="/registro">Registro</Link>
+        <Link href="/portal">Acceso</Link>
       </nav>
     </header>
   );

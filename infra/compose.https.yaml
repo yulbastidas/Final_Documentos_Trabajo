@@ -3,12 +3,17 @@ services:
     environment:
       FRONTEND_ORIGIN: ${PUBLIC_ORIGIN:?Definir PUBLIC_ORIGIN con https:// y el host público}
       NODE_ENV: production
-      COOKIE_SECURE: "true"
+      COOKIE_SECURE: 'true'
 
   nginx:
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Definir PUBLIC_ORIGIN con https:// y el host público}
+      NGINX_ENVSUBST_FILTER: ^PUBLIC_ORIGIN$
     ports: !override
-      - "127.0.0.1:80:8080"
-      - "127.0.0.1:443:8443"
+      - '127.0.0.1:${HTTPS_REDIRECT_PORT:-80}:8080'
+      - '127.0.0.1:${HTTPS_PORT:-443}:8443'
     volumes: !override
-      - ./nginx/https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/https.conf:/etc/nginx/templates/default.conf.template:ro
       - ./tls:/etc/nginx/tls:ro
+    tmpfs:
+      - /etc/nginx/conf.d:rw,noexec,nosuid,size=1m,uid=101,gid=101,mode=0755
