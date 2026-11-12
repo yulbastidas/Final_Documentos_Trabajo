@@ -2,7 +2,7 @@ name: securedocs
 
 services:
   mysql:
-    image: mysql:8.4
+    image: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-securedocs}
@@ -90,12 +90,14 @@ services:
       DB_PASSWORD_FILE: /run/secrets/mysql_password
       DOCUMENT_KEK_ID: ${DOCUMENT_KEK_ID:-k1}
       DOCUMENT_KEK_FILE: /run/secrets/document_kek
+      DOCUMENT_KEK_PREVIOUS_FILE: /run/secrets/document_kek_previous
       MFA_ENCRYPTION_KEY_FILE: /run/secrets/mfa_encryption_key
       CSRF_SECRET_FILE: /run/secrets/csrf_secret
       STORAGE_DIR: /var/lib/securedocs/documents
     secrets:
       - mysql_password
       - document_kek
+      - document_kek_previous
       - mfa_encryption_key
       - csrf_secret
     volumes:
@@ -154,7 +156,7 @@ services:
       - /app/frontend/.next/cache:rw,noexec,nosuid,size=64m
 
   nginx:
-    image: nginxinc/nginx-unprivileged:1.29-alpine
+    image: nginxinc/nginx-unprivileged:1.30-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
     restart: unless-stopped
     ports:
       - '127.0.0.1:${HTTP_PORT:-8080}:8080'
@@ -196,6 +198,8 @@ secrets:
     file: ../.secrets/mysql_root_password
   document_kek:
     file: ../.secrets/document_kek
+  document_kek_previous:
+    file: ../.secrets/document_kek_previous
   mfa_encryption_key:
     file: ../.secrets/mfa_encryption_key
   csrf_secret:

@@ -28,4 +28,9 @@ try {
   $random.Dispose()
 }
 
+$previousKeyPath = Join-Path $secretDirectory 'document_kek_previous'
+if (-not (Test-Path -LiteralPath $previousKeyPath)) {
+  [IO.File]::WriteAllText($previousKeyPath, '', [Text.Encoding]::ASCII)
+}
+
 Write-Output 'Se crearon los secretos locales que faltaban en .secrets/ (ignorados por Git).'

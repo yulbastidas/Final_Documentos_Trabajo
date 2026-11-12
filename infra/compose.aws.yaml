@@ -1,0 +1,75 @@
+# Producción AWS: solo Nginx publica puertos. EC2 ejecuta Docker Compose en
+# una sola AZ; MySQL y los documentos persisten en volúmenes EBS cifrados.
+x-aws-logging: &aws-logging
+  driver: awslogs
+  options:
+    awslogs-group: /securedocs/prod
+    awslogs-region: ${AWS_REGION:?Definir AWS_REGION}
+    awslogs-create-group: 'false'
+
+services:
+  storage-init:
+    image: ${BACKEND_IMAGE:?Definir BACKEND_IMAGE}
+
+  migrate:
+    image: ${BACKEND_IMAGE:?Definir BACKEND_IMAGE}
+    logging:
+      <<: *aws-logging
+      options:
+        awslogs-group: /securedocs/prod
+        awslogs-region: ${AWS_REGION:?Definir AWS_REGION}
+        awslogs-create-group: 'false'
+        awslogs-stream-prefix: migrate
+
+  mysql:
+    restart: unless-stopped
+    logging:
+      <<: *aws-logging
+      options:
+        awslogs-group: /securedocs/prod
+        awslogs-region: ${AWS_REGION:?Definir AWS_REGION}
+        awslogs-create-group: 'false'
+        awslogs-stream-prefix: mysql
+
+  backend:
+    image: ${BACKEND_IMAGE:?Definir BACKEND_IMAGE}
+    build: !reset null
+    environment:
+      NODE_ENV: production
+      COOKIE_SECURE: 'true'
+      REGISTRATION_MODE: ${REGISTRATION_MODE:-closed}
+    logging:
+      <<: *aws-logging
+      options:
+        awslogs-group: /securedocs/prod
+        awslogs-region: ${AWS_REGION:?Definir AWS_REGION}
+        awslogs-create-group: 'false'
+        awslogs-stream-prefix: backend
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?Definir FRONTEND_IMAGE}
+    build: !reset null
+    logging:
+      <<: *aws-logging
+      options:
+        awslogs-group: /securedocs/prod
+        awslogs-region: ${AWS_REGION:?Definir AWS_REGION}
+        awslogs-create-group: 'false'
+        awslogs-stream-prefix: frontend
+
+  nginx:
+    environment:
+      DEMO_BLOCK: |
+        location = /dashboard { return 404; }
+        location ^~ /dashboard/ { return 404; }
+    ports: !override
+      - '80:8080'
+      - '443:8443'
+    logging:
+      <<: *aws-logging
+      options:
+        awslogs-group: /securedocs/prod
+        awslogs-region: ${AWS_REGION:?Definir AWS_REGION}
+        awslogs-create-group: 'false'
+        awslogs-stream-prefix: nginx
+

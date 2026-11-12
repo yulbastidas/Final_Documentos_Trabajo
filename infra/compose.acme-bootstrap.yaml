@@ -1,0 +1,10 @@
+# Nginx solo sirve los desafíos ACME durante la primera emisión del certificado.
+# No inicia la API ni el portal en HTTP.
+services:
+  nginx:
+    ports: !override
+      - '80:8080'
+    volumes: !override
+      - ./aws/acme-bootstrap.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../.certbot/webroot:/var/www/certbot:ro
+    depends_on: !reset []

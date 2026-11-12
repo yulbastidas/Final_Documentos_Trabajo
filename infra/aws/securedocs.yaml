@@ -1,0 +1,760 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SecureDocs budget-focused single EC2 deployment. Creating this stack creates billable AWS resources.
+
+Parameters:
+  GitHubOidcProviderArn:
+    Type: String
+    Description: ARN of the existing GitHub Actions OIDC provider in this account.
+  PublicDomain:
+    Type: String
+    Description: DNS name that will point to the Elastic IP after approval.
+    AllowedPattern: '^[a-zA-Z0-9.-]+$'
+  CertificateEmail:
+    Type: String
+    Description: Address used by the Let's Encrypt expiry notices.
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.small, t3.medium]
+    Description: t3.small aims for the USD 25 ceiling; t3.medium exceeds it and needs approval.
+  MonthlyBudgetUsd:
+    Type: Number
+    MinValue: 10
+    Description: AWS Budgets notification threshold; it does not stop resources.
+  BudgetAlertEmail:
+    Type: String
+    Description: Email required for actual spend and infrastructure alerts.
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+
+Conditions:
+  CreateBudget:
+    Fn::Not:
+      - Fn::Equals:
+          - Ref: BudgetAlertEmail
+          - ''
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.42.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: securedocs-prod
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: securedocs-prod
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.42.1.0/24
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ''
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: securedocs-prod-public
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  ApplicationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS and HTTP redirect only; administration uses SSM.
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP redirect and ACME renewal
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Public HTTPS
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Outbound package, ECR, SSM, and backup traffic
+      Tags:
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub securedocs-backups-${AWS::AccountId}-${AWS::Region}
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      Tags:
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireBackupsAfter30Days
+            Status: Enabled
+            ExpirationInDays: 30
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  BackendRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: securedocs-backend
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: IMMUTABLE
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Keep the 3 most recent deployment images","selection":{"tagStatus":"tagged","countType":"imageCountMoreThan","countNumber":3},"action":{"type":"expire"}}]}'
+      Tags:
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  FrontendRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: securedocs-frontend
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: IMMUTABLE
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Keep the 3 most recent deployment images","selection":{"tagStatus":"tagged","countType":"imageCountMoreThan","countNumber":3},"action":{"type":"expire"}}]}'
+      Tags:
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  ApplicationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /securedocs/prod
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  ApplicationErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApplicationLogGroup
+      FilterPattern: 'ERROR'
+      MetricTransformations:
+        - MetricName: ApplicationErrors
+          MetricNamespace: SecureDocs/Logs
+          MetricValue: '1'
+          DefaultValue: 0
+
+  SecureDocsDeployDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: SecureDocsDeploy
+      DocumentType: Command
+      DocumentFormat: YAML
+      Content:
+        schemaVersion: '2.2'
+        description: Deploy immutable SecureDocs images on the tagged production instance.
+        parameters:
+          Commit:
+            type: String
+            allowedPattern: '^[a-f0-9]{40}$'
+          BackendImage:
+            type: String
+            allowedPattern: '^[0-9]+\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com/securedocs-backend:[a-f0-9]{40}$'
+          FrontendImage:
+            type: String
+            allowedPattern: '^[0-9]+\\.dkr\\.ecr\\.[a-z0-9-]+\\.amazonaws\\.com/securedocs-frontend:[a-f0-9]{40}$'
+          PublicOrigin:
+            type: String
+            allowedPattern: '^https://[a-zA-Z0-9.-]+$'
+        mainSteps:
+          - action: aws:runShellScript
+            name: deploy
+            inputs:
+              runCommand:
+                - sudo /usr/local/sbin/securedocs-deploy {{ Commit }} {{ BackendImage }} {{ FrontendImage }} {{ PublicOrigin }}
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: SecureDocsRuntimeAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadApplicationSecrets
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/securedocs/prod/mysql-password
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/securedocs/prod/mysql-root-password
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/securedocs/prod/document-kek
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/securedocs/prod/document-kek-previous
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/securedocs/prod/mfa-encryption-key
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/securedocs/prod/csrf-secret
+              - Sid: DecryptOnlySecureDocsParametersViaSsm
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub ssm.${AWS::Region}.${AWS::URLSuffix}
+                  StringLike:
+                    kms:EncryptionContext:PARAMETER_ARN: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/securedocs/prod/*
+              - Sid: PullSecureDocsImages
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:DescribeImages
+                Resource:
+                  - !GetAtt BackendRepository.Arn
+                  - !GetAtt FrontendRepository.Arn
+              - Sid: WriteAndRestoreBackups
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                Resource: !Sub ${BackupBucket.Arn}/backups/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt BackupBucket.Arn
+                Condition:
+                  StringLike:
+                    s3:prefix: backups/*
+              - Sid: WriteContainerLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: !Sub ${ApplicationLogGroup.Arn}:log-stream:*
+              - Sid: PublishBackupMetric
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: SecureDocs/Operations
+              - Sid: PublishHostHealthMetrics
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: SecureDocs/Host
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  ApplicationInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      InstanceType: !Ref InstanceType
+      CreditSpecification:
+        CpuCredits: standard
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds: [!GetAtt ApplicationSecurityGroup.GroupId]
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      Tags:
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          dnf update -y
+          dnf install -y docker git awscli jq tar gzip curl
+          dnf install -y amazon-cloudwatch-agent
+          install -d -m 0755 /usr/local/lib/docker/cli-plugins
+          curl --fail --silent --show-error --location \
+            https://github.com/docker/compose/releases/download/v5.7.1/docker-compose-linux-x86_64 \
+            -o /usr/local/lib/docker/cli-plugins/docker-compose
+          echo 'af426722a8af5de812fcee30cc1c39f0639f5f723cbadefb25e5d4db054064cf  /usr/local/lib/docker/cli-plugins/docker-compose' | sha256sum --check --status
+          chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+          systemctl enable --now docker
+          docker compose version
+          install -d -m 0750 /opt/securedocs /etc/securedocs
+          git clone --depth 1 https://github.com/yulbastidas/Final_Documentos_Trabajo.git /opt/securedocs/repo
+          printf '%s\n' '${AWS::Region}' > /etc/securedocs/region
+          cat > /etc/securedocs/deploy.env <<'ENVVARS'
+          DOMAIN=${PublicDomain}
+          CERTIFICATE_EMAIL=${CertificateEmail}
+          BACKUP_BUCKET=${BackupBucket}
+          BACKEND_REPOSITORY=${BackendRepository.RepositoryUri}
+          FRONTEND_REPOSITORY=${FrontendRepository.RepositoryUri}
+          ENVVARS
+          chmod 0640 /etc/securedocs/deploy.env
+          install -d -m 0755 /opt/aws/amazon-cloudwatch-agent/etc
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/securedocs.json <<'CWAGENT'
+          {
+            "metrics": {
+              "namespace": "SecureDocs/Host",
+              "append_dimensions": {"InstanceId": "${!aws:InstanceId}"},
+              "aggregation_dimensions": [["InstanceId"]],
+              "metrics_collected": {
+                "mem": {"measurement": ["mem_used_percent"], "metrics_collection_interval": 60},
+                "disk": {"measurement": ["used_percent"], "resources": ["/"], "metrics_collection_interval": 60}
+              }
+            }
+          }
+          CWAGENT
+          amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 \
+            -c file:/opt/aws/amazon-cloudwatch-agent/etc/securedocs.json -s
+          ln -s /opt/securedocs/repo/infra/aws/securedocs-deploy.sh /usr/local/sbin/securedocs-deploy
+          ln -s /opt/securedocs/repo/infra/aws/securedocs-renew-certificate.sh /usr/local/sbin/securedocs-renew-certificate
+          ln -s /opt/securedocs/repo/infra/aws/securedocs-backup.sh /usr/local/sbin/securedocs-backup
+          ln -s /opt/securedocs/repo/infra/aws/create-admin.sh /usr/local/sbin/securedocs-create-admin
+          ln -s /opt/securedocs/repo/infra/aws/securedocs-health-check.sh /usr/local/sbin/securedocs-health-check
+          cat > /etc/systemd/system/securedocs-cert-renew.service <<'UNIT'
+          [Unit]
+          Description=Renew SecureDocs Let's Encrypt certificate
+          After=docker.service
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/securedocs-renew-certificate
+          UNIT
+          cat > /etc/systemd/system/securedocs-cert-renew.timer <<'UNIT'
+          [Unit]
+          Description=Check SecureDocs certificate renewal daily
+          [Timer]
+          OnCalendar=daily
+          RandomizedDelaySec=2h
+          Persistent=true
+          [Install]
+          WantedBy=timers.target
+          UNIT
+          cat > /etc/systemd/system/securedocs-backup.service <<'UNIT'
+          [Unit]
+          Description=Consistent SecureDocs database and encrypted-document backup
+          After=docker.service
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/bash /usr/local/sbin/securedocs-backup
+          UNIT
+          cat > /etc/systemd/system/securedocs-backup.timer <<'UNIT'
+          [Unit]
+          Description=Daily SecureDocs backup
+          [Timer]
+          OnCalendar=*-*-* 03:00:00 UTC
+          RandomizedDelaySec=1h
+          Persistent=true
+          [Install]
+          WantedBy=timers.target
+          UNIT
+          cat > /etc/systemd/system/securedocs-health-check.service <<'UNIT'
+          [Unit]
+          Description=Check SecureDocs HTTPS readiness
+          After=docker.service
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/securedocs-health-check
+          UNIT
+          cat > /etc/systemd/system/securedocs-health-check.timer <<'UNIT'
+          [Unit]
+          Description=Publish SecureDocs readiness metric every minute
+          [Timer]
+          OnBootSec=2min
+          OnUnitActiveSec=1min
+          AccuracySec=15s
+          Persistent=true
+          [Install]
+          WantedBy=timers.target
+          UNIT
+          systemctl daemon-reload
+          systemctl enable --now securedocs-cert-renew.timer
+          systemctl enable --now securedocs-backup.timer
+          systemctl enable --now securedocs-health-check.timer
+          systemctl enable amazon-ssm-agent || true
+          systemctl start amazon-ssm-agent || true
+          chown -R root:root /opt/securedocs
+          chmod -R go-w /opt/securedocs
+
+  ApplicationAddress:
+    Type: AWS::EC2::EIP
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref ApplicationInstance
+      Tags:
+        - Key: Name
+          Value: securedocs-prod
+        - Key: Project
+          Value: SecureDocs
+        - Key: Environment
+          Value: production
+
+  BackupBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BackupBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt BackupBucket.Arn
+              - !Sub ${BackupBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+  OperationalAlertsTopic:
+    Type: AWS::SNS::Topic
+    Condition: CreateBudget
+    Properties:
+      TopicName: securedocs-prod-alerts
+
+  OperationalAlertsSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: CreateBudget
+    Properties:
+      Protocol: email
+      Endpoint: !Ref BudgetAlertEmail
+      TopicArn: !Ref OperationalAlertsTopic
+
+  InstanceStatusAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateBudget
+    Properties:
+      AlarmName: securedocs-prod-ec2-status-check
+      AlarmDescription: EC2 failed a system or instance status check.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref ApplicationInstance
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OperationalAlertsTopic]
+
+  HighCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateBudget
+    Properties:
+      AlarmName: securedocs-prod-high-cpu
+      AlarmDescription: EC2 CPU exceeded 85 percent for 10 minutes.
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref ApplicationInstance
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 85
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OperationalAlertsTopic]
+
+  BackupMissingAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateBudget
+    Properties:
+      AlarmName: securedocs-prod-backup-missing
+      AlarmDescription: No successful daily database and encrypted-document backup metric was received.
+      Namespace: SecureDocs/Operations
+      MetricName: BackupSuccess
+      Dimensions:
+        - Name: Project
+          Value: SecureDocs
+      Statistic: Minimum
+      Period: 86400
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref OperationalAlertsTopic]
+
+  HighMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateBudget
+    Properties:
+      AlarmName: securedocs-prod-high-memory
+      AlarmDescription: Host memory usage exceeded 90 percent for 10 minutes.
+      Namespace: SecureDocs/Host
+      MetricName: mem_used_percent
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref ApplicationInstance
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 90
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OperationalAlertsTopic]
+
+  HighDiskAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateBudget
+    Properties:
+      AlarmName: securedocs-prod-high-disk
+      AlarmDescription: Root filesystem usage exceeded 85 percent for 10 minutes.
+      Namespace: SecureDocs/Host
+      MetricName: disk_used_percent
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref ApplicationInstance
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 85
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OperationalAlertsTopic]
+
+  ApplicationReadinessAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateBudget
+    Properties:
+      AlarmName: securedocs-prod-app-not-ready
+      AlarmDescription: HTTPS readiness checks from EC2 reported failure.
+      Namespace: SecureDocs/Host
+      MetricName: AppReady
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref ApplicationInstance
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OperationalAlertsTopic]
+
+  ApplicationErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateBudget
+    Properties:
+      AlarmName: securedocs-prod-application-errors
+      AlarmDescription: Application log lines containing ERROR occurred in the last five minutes.
+      Namespace: SecureDocs/Logs
+      MetricName: ApplicationErrors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref OperationalAlertsTopic]
+
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Pushes immutable SecureDocs images and invokes one tagged EC2 instance through SSM.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOidcProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: repo:yulbastidas/Final_Documentos_Trabajo:environment:production
+      Policies:
+        - PolicyName: DeploySecureDocs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:DescribeImages
+                Resource:
+                  - !GetAtt BackendRepository.Arn
+                  - !GetAtt FrontendRepository.Arn
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:document/SecureDocsDeploy
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${ApplicationInstance}
+                Condition:
+                  StringEquals:
+                    ssm:resourceTag/Project: SecureDocs
+              - Effect: Allow
+                Action: ssm:GetCommandInvocation
+                Resource: '*'
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Condition: CreateBudget
+    Properties:
+      Budget:
+        BudgetName: SecureDocs-monthly
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+        TimeUnit: MONTHLY
+        BudgetType: COST
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetAlertEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetAlertEmail
+
+Outputs:
+  PublicIp:
+    Description: Create/update the DNS A record only after explicit approval.
+    Value: !Ref ApplicationAddress
+  InstanceId:
+    Value: !Ref ApplicationInstance
+  BackendEcrRepositoryUri:
+    Value: !GetAtt BackendRepository.RepositoryUri
+  FrontendEcrRepositoryUri:
+    Value: !GetAtt FrontendRepository.RepositoryUri
+  GitHubDeployRoleArn:
+    Value: !GetAtt GitHubDeployRole.Arn
+  BackupBucketName:
+    Value: !Ref BackupBucket
+  WebsiteUrl:
+    Value: !Sub https://${PublicDomain}
+

@@ -4,6 +4,7 @@ Sistema de Gestión Documental Segura — Sistemas de Comunicación y Seguridad 
 
 **Estado: portal conectado al backend y entorno local con Compose.** En `/portal` se usan sesiones, MFA, documentos, usuarios, auditoría y reportes de la API v0.1.0. En `/dashboard` se conserva la demostración con datos ficticios. Compose coordina MySQL, migraciones, almacenamiento privado, API, frontend y Nginx. HTTPS local usa certificados externos. Ver [integración del portal](docs/integracion-frontend-backend.md), [entrega de Jacobo](docs/entrega-jacobo.md) y [entrega de Jerónimo](docs/entrega-jeronimo.md).
 
+
 ## Inicio local
 
 Node.js 24.14+ (línea 24), npm 11. Desde la raíz:
