@@ -1,0 +1,221 @@
+name: Desplegar SecureDocs en AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Commit SHA from main; use a retained ECR tag to roll back.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: securedocs-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
+      BACKEND_ECR_URI: ${{ vars.BACKEND_ECR_URI }}
+      FRONTEND_ECR_URI: ${{ vars.FRONTEND_ECR_URI }}
+      AWS_EC2_INSTANCE_ID: ${{ vars.AWS_EC2_INSTANCE_ID }}
+      DEPLOY_SHA: ${{ inputs.release_sha || github.sha }}
+      RELEASE_SHA_INPUT: ${{ inputs.release_sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$AWS_REGION" =~ ^[a-z0-9-]+$ ]]
+          [[ "$PUBLIC_ORIGIN" =~ ^https://[a-zA-Z0-9.-]+$ ]]
+          [[ "$BACKEND_ECR_URI" =~ ^[0-9]+\.dkr\.ecr\.${AWS_REGION}\.amazonaws\.com/securedocs-backend$ ]]
+          [[ "$FRONTEND_ECR_URI" =~ ^[0-9]+\.dkr\.ecr\.${AWS_REGION}\.amazonaws\.com/securedocs-frontend$ ]]
+          [[ "${BACKEND_ECR_URI%%/securedocs-backend}" == "${FRONTEND_ECR_URI%%/securedocs-frontend}" ]]
+          [[ "$AWS_EC2_INSTANCE_ID" =~ ^i-[0-9a-f]+$ ]]
+          git fetch --depth=1000 origin main
+          git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and check types
+        run: |
+          npm run build
+          npm run check
+
+      - name: Run unit and backend integration tests
+        run: |
+          npm run test:unit -w frontend
+          npm run test:unit -w backend
+          npm run test:e2e -w backend
+
+      - name: Install browser for frontend E2E tests
+        run: npx playwright install --with-deps chrome
+
+      - name: Run frontend E2E tests
+        run: npm run test:e2e -w frontend
+
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
+
+      - name: Assume AWS role with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: securedocs-${{ github.run_id }}
+
+      - name: Login to ECR
+        shell: bash
+        run: |
+          set -euo pipefail
+          registry="${BACKEND_ECR_URI%%/*}"
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$registry"
+
+      - name: Scan repository configuration and dependencies
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Build production images
+        shell: bash
+        run: |
+          set -euo pipefail
+          if aws ecr describe-images --repository-name securedocs-backend --image-ids imageTag="$DEPLOY_SHA" --region "$AWS_REGION" >/dev/null 2>&1; then
+            docker pull "${BACKEND_ECR_URI}:${DEPLOY_SHA}"
+          else
+            [[ -z "$RELEASE_SHA_INPUT" ]] || { echo 'Rollback image is no longer retained in ECR.' >&2; exit 1; }
+            docker build --pull -f infra/docker/backend.Dockerfile -t "${BACKEND_ECR_URI}:${DEPLOY_SHA}" .
+          fi
+          if aws ecr describe-images --repository-name securedocs-frontend --image-ids imageTag="$DEPLOY_SHA" --region "$AWS_REGION" >/dev/null 2>&1; then
+            docker pull "${FRONTEND_ECR_URI}:${DEPLOY_SHA}"
+          else
+            [[ -z "$RELEASE_SHA_INPUT" ]] || { echo 'Rollback image is no longer retained in ECR.' >&2; exit 1; }
+            docker build --pull -f infra/docker/frontend.Dockerfile \
+              --build-arg "NEXT_PUBLIC_API_URL=${PUBLIC_ORIGIN}/api/v1" \
+              -t "${FRONTEND_ECR_URI}:${DEPLOY_SHA}" .
+          fi
+          docker pull mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+          docker pull nginxinc/nginx-unprivileged:1.30-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+          docker pull certbot/certbot:v5.10.0
+
+      - name: Scan production images
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.BACKEND_ECR_URI }}:${{ env.DEPLOY_SHA }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.FRONTEND_ECR_URI }}:${{ env.DEPLOY_SHA }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan MySQL image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan Nginx image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: nginxinc/nginx-unprivileged:1.30-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan Certbot image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: certbot/certbot:v5.10.0
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Push immutable images to ECR
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecr describe-images --repository-name securedocs-backend --image-ids imageTag="$DEPLOY_SHA" --region "$AWS_REGION" >/dev/null 2>&1 || docker push "${BACKEND_ECR_URI}:${DEPLOY_SHA}"
+          aws ecr describe-images --repository-name securedocs-frontend --image-ids imageTag="$DEPLOY_SHA" --region "$AWS_REGION" >/dev/null 2>&1 || docker push "${FRONTEND_ECR_URI}:${DEPLOY_SHA}"
+
+      - name: Deploy with SSM and verify readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          parameters="$(jq -cn \
+            --arg commit "$DEPLOY_SHA" \
+            --arg backend "${BACKEND_ECR_URI}:${DEPLOY_SHA}" \
+            --arg frontend "${FRONTEND_ECR_URI}:${DEPLOY_SHA}" \
+            --arg origin "$PUBLIC_ORIGIN" \
+            '{Commit:[$commit],BackendImage:[$backend],FrontendImage:[$frontend],PublicOrigin:[$origin]}')"
+          command_id="$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --document-name SecureDocsDeploy \
+            --instance-ids "$AWS_EC2_INSTANCE_ID" \
+            --parameters "$parameters" \
+            --query 'Command.CommandId' --output text)"
+          for attempt in $(seq 1 60); do
+            status="$(aws ssm get-command-invocation \
+              --region "$AWS_REGION" --command-id "$command_id" \
+              --instance-id "$AWS_EC2_INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || true)"
+            case "$status" in
+              Success) echo "Deployed ${DEPLOY_SHA}; HTTPS readiness passed on the instance."; exit 0 ;;
+              Failed|Cancelled|TimedOut) echo "SSM deployment ended with status ${status}." >&2; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo 'SSM deployment did not finish within 10 minutes.' >&2
+          exit 1

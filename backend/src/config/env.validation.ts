@@ -54,6 +54,7 @@ export const envValidationSchema = Joi.object({
   DOCUMENT_KEK_FILE: optionalSecret,
   // Claves anteriores, solo para descifrar: "id:base64,id2:base64".
   DOCUMENT_KEK_PREVIOUS: optionalSecret,
+  DOCUMENT_KEK_PREVIOUS_FILE: optionalSecret,
   MFA_ENCRYPTION_KEY: optionalSecret,
   MFA_ENCRYPTION_KEY_FILE: optionalSecret,
   CSRF_SECRET: optionalSecret,

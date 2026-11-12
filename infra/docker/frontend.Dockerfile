@@ -9,6 +9,12 @@ RUN npm ci
 COPY frontend frontend
 ARG NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# The synthetic /dashboard workspace is for local presentations only. Keep its
+# source in the repository, but exclude the route and fixtures from the public
+# production image rather than relying only on an edge rewrite.
+RUN rm -rf frontend/src/app/dashboard \
+    frontend/src/components/workspace \
+    frontend/src/lib/fixtures.ts
 RUN npm run build -w frontend
 RUN npm prune --omit=dev \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \

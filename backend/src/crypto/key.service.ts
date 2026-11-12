@@ -29,7 +29,11 @@ export class KeyService {
     };
     this.documentKekId = config.getOrThrow<string>('DOCUMENT_KEK_ID');
     this.documentKeks.set(this.documentKekId, read('DOCUMENT_KEK'));
-    for (const entry of (config.get<string>('DOCUMENT_KEK_PREVIOUS') ?? '')
+    const previousFile = config.get<string>('DOCUMENT_KEK_PREVIOUS_FILE');
+    const previousKeys = previousFile
+      ? readFileSync(previousFile, 'utf8').trim()
+      : (config.get<string>('DOCUMENT_KEK_PREVIOUS') ?? '');
+    for (const entry of previousKeys
       .split(',')
       .map((e) => e.trim())
       .filter(Boolean)) {

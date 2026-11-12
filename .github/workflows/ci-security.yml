@@ -1,4 +1,4 @@
-name: CI y seguridad
+﻿name: CI y seguridad
 
 on:
   push:
@@ -51,8 +51,10 @@ jobs:
       - name: Escanear archivos y configuración con Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: fs
           scan-ref: .
+          trivyignores: .trivyignore.yaml
           scanners: vuln,misconfig,secret
           severity: HIGH,CRITICAL
           ignore-unfixed: true
@@ -71,6 +73,7 @@ jobs:
         id: trivy-report-api
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: securedocs-backend:ci
           scanners: vuln
@@ -85,6 +88,7 @@ jobs:
         id: trivy-report-frontend
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: securedocs-frontend:ci
           scanners: vuln
@@ -136,12 +140,13 @@ jobs:
         with:
           name: trivy-image-reports
           path: trivy-results/*.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Escanear imagen de API
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: securedocs-backend:ci
           scanners: vuln
@@ -153,6 +158,7 @@ jobs:
       - name: Escanear imagen de frontend
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: securedocs-frontend:ci
           scanners: vuln

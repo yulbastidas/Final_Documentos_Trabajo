@@ -11,6 +11,7 @@ blob-report/
 !.env.example
 .secrets/
 infra/tls/
+.certbot/
 *.log
 *.pem
 *.key
