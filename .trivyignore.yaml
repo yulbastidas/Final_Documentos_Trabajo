@@ -1,0 +1,18 @@
+misconfigurations:
+  - id: AWS-0104
+    paths:
+      - infra/aws/securedocs.yaml
+    expired_at: 2027-05-12
+    statement: >-
+      EC2 egress is limited to TCP 443. The instance needs HTTPS access to
+      package repositories, ECR, SSM, ACME and S3, whose destinations do not
+      share a stable prefix list. Reevaluate before expiry or when a private
+      egress design fits the project budget.
+  - id: AWS-0136
+    paths:
+      - infra/aws/securedocs.yaml
+    expired_at: 2027-05-12
+    statement: >-
+      The topic uses AWS-managed SNS KMS encryption and only carries operational
+      alarm notifications. A customer-managed KMS key adds recurring cost;
+      reevaluate if sensitive data is added or the budget changes.

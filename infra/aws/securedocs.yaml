@@ -75,7 +75,7 @@ Resources:
         Fn::Select:
           - 0
           - Fn::GetAZs: ''
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: securedocs-prod-public
@@ -125,15 +125,18 @@ Resources:
           CidrIp: 0.0.0.0/0
           Description: Public HTTPS
       SecurityGroupEgress:
-        - IpProtocol: -1
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
           CidrIp: 0.0.0.0/0
-          Description: Outbound package, ECR, SSM, and backup traffic
+          Description: HTTPS-only outbound for package, ECR, SSM, and backup traffic
       Tags:
         - Key: Project
           Value: SecureDocs
         - Key: Environment
           Value: production
 
+  #trivy:ignore:AWS-0132:exp:2027-05-12
   BackupBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
@@ -150,7 +153,7 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+              SSEAlgorithm: AES256 # App payloads are encrypted before upload; SSE-KMS CMK adds recurring cost.
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
@@ -518,6 +521,7 @@ Resources:
     Condition: CreateBudget
     Properties:
       TopicName: securedocs-prod-alerts
+      KmsMasterKeyId: alias/aws/sns
 
   OperationalAlertsSubscription:
     Type: AWS::SNS::Subscription

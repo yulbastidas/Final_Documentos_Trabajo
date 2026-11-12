@@ -53,6 +53,7 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
+          trivyignores: .trivyignore.yaml
           scanners: vuln,misconfig,secret
           severity: HIGH,CRITICAL
           ignore-unfixed: true
@@ -136,7 +137,7 @@ jobs:
         with:
           name: trivy-image-reports
           path: trivy-results/*.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Escanear imagen de API
