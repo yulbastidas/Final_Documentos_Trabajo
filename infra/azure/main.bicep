@@ -37,6 +37,9 @@ param githubRepository string = 'yulbastidas/Final_Documentos_Trabajo'
 @description('Environment de GitHub Actions autorizado a desplegar.')
 param githubEnvironment string = 'production'
 
+@description('Sujeto OIDC con IDs inmutables que GitHub emite ahora: repo:<owner>@<ownerId>/<repo>@<repoId>:environment:<env>. Vacío para omitirlo.')
+param githubImmutableSubject string = 'repo:yulbastidas@134234125/Final_Documentos_Trabajo@1445109005:environment:production'
+
 var suffix = uniqueString(resourceGroup().id)
 var vmName = 'securedocs-vm'
 var acrName = 'securedocs${suffix}'
@@ -311,6 +314,18 @@ resource githubFederation 'Microsoft.ManagedIdentity/userAssignedIdentities/fede
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
     subject: 'repo:${githubRepository}:environment:${githubEnvironment}'
+    audiences: ['api://AzureADTokenExchange']
+  }
+}
+
+// GitHub emite el sujeto con IDs de propietario y repositorio (no cambia si se renombra).
+resource githubFederationImmutable 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = if (!empty(githubImmutableSubject)) {
+  parent: githubIdentity
+  name: 'github-${githubEnvironment}-immutable'
+  dependsOn: [githubFederation]
+  properties: {
+    issuer: 'https://token.actions.githubusercontent.com'
+    subject: githubImmutableSubject
     audiences: ['api://AzureADTokenExchange']
   }
 }
