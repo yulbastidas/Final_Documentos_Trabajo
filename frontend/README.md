@@ -69,6 +69,6 @@ No guardar claves ni sesiones en localStorage/sessionStorage. No usar documentos
 
 Las entradas se muestran como texto mediante React, sin HTML arbitrario. El CSV escapa comillas y neutraliza prefijos de fórmula. Los roles solo controlan la experiencia visual; el servidor debe autorizar cada operación. No hay checksum, tag GCM, eventos inmutables ni verificación de malware en el frontend.
 
-next.config.ts prepara nosniff, bloqueo de framing, política de referrer y permisos de dispositivos. La CSP es parcial (framing, objetos, base y formularios); no implementa una política completa de scripts. HTTPS/HSTS, nonces y CSP definitiva deben acordarse con Jerónimo y probarse con Next.js. No se habilita HSTS en localhost.
+next.config.ts prepara nosniff, bloqueo de framing, política de referrer y permisos de dispositivos. La CSP limita todo al propio origen (`default-src 'self'`) y `connect-src` al origen de la API. `script-src` conserva `'unsafe-inline'` porque Next.js hidrata con scripts en línea; en desarrollo añade `'unsafe-eval'` y WebSocket para el recargado en caliente. Una CSP con nonces queda como mejora. La imagen Docker fija `NEXT_PUBLIC_DEMO_ENABLED=false`: elimina `/dashboard` y oculta sus enlaces. No se habilita HSTS en localhost.
 
 No se modificó docs/api.md ni se conectaron endpoints futuros sin acuerdo. Ver [entrega de Yuly](../docs/entrega-yuly.md) para las dependencias de integración y la preparación del commit.

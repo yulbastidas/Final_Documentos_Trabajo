@@ -1,20 +1,21 @@
 import Link from 'next/link';
+import { DEMO_ENABLED } from '../lib/demo';
 import { Header } from '../components/header';
 const capabilities = [
   [
     '01',
     'Identidad y acceso',
-    'Interfaces de usuarios, roles y MFA. Verificación real pendiente del servidor.',
+    'Contraseñas con Argon2id, MFA TOTP, sesiones revocables y permisos por rol verificados en el servidor.',
   ],
   [
     '02',
     'Confidencialidad',
-    'Experiencia documental preparada. Cifrado AES-256-GCM e integridad pendientes del servidor.',
+    'Cada documento se cifra con AES-256-GCM y una clave propia; la huella SHA-256 detecta cualquier alteración.',
   ],
   [
     '03',
     'Trazabilidad',
-    'Explora reportes y actividad de ejemplo. Los eventos reales se integrarán con la API.',
+    'Inicios de sesión, cargas, descargas y denegaciones quedan en una auditoría con reportes exportables.',
   ],
 ];
 export default function Home() {
@@ -38,9 +39,11 @@ export default function Home() {
               <Link className="button" href="/portal">
                 Abrir portal →
               </Link>
-              <Link className="secondary-button" href="/dashboard">
-                Explorar demostración →
-              </Link>
+              {DEMO_ENABLED && (
+                <Link className="secondary-button" href="/dashboard">
+                  Explorar demostración →
+                </Link>
+              )}
               <a
                 className="rounded-lg border border-slate-600 px-5 py-3"
                 href="#arquitectura"
@@ -49,14 +52,13 @@ export default function Home() {
               </a>
             </div>
             <p className="mt-6 text-xs text-slate-400">
-              DEMOSTRACIÓN DEL FRONTEND · DATOS FICTICIOS · SIN DOCUMENTOS
-              REALES
+              PROYECTO ACADÉMICO · USA SOLO DATOS SINTÉTICOS
             </p>
           </div>
           <aside aria-label="Estado del proyecto" className="panel p-8">
             <div className="flex justify-between text-xs text-slate-400">
               <span>SECUREDOCS / SISTEMA</span>
-              <span className="text-emerald-300">DEMO INTERACTIVA</span>
+              <span className="text-emerald-300">PORTAL CONECTADO</span>
             </div>
             <div
               aria-hidden="true"
@@ -68,8 +70,8 @@ export default function Home() {
               Construido para la confianza
             </h2>
             <p className="mt-3 leading-7 text-slate-400">
-              Seguridad planificada en cada capa. Los controles se implementarán
-              y validarán por fases.
+              Seguridad en cada capa: identidad, cifrado, proxy endurecido y
+              análisis automáticos en cada cambio.
             </p>
             <div className="mt-8 border-t border-slate-700 pt-5 text-sm text-slate-300">
               Interfaz / API / Infraestructura

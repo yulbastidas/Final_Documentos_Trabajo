@@ -1,6 +1,22 @@
 # Plan y criterios de aceptación
 
-La base de Fase 0 y las entregas de Yuly, Jacobo y Jerónimo están en `developer`. El backend, Compose, proxy local, workflows y guías de laboratorios ya tienen implementación. La integración visual del backend, la validación completa de Docker/HTTPS y la aceptación conjunta siguen pendientes; ver las entregas individuales. Estos archivos no activan reglas de protección de ramas en GitHub.
+Las entregas de Yuly, Jacobo y Jerónimo están integradas en `main`: portal conectado a la API, Compose con MySQL y Nginx, HTTPS local, CI con Trivy, despliegue en AWS y laboratorios. La tabla de estado resume la evidencia de cada fase; la aceptación final la confirma el equipo en conjunto. Estos archivos no activan reglas de protección de ramas en GitHub.
+
+## Estado al 14 de noviembre de 2026
+
+| Fase | Estado   | Evidencia                                                                                                                                                                                                            |
+| ---- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Cumplida | Compose completo levantado; health, readiness y Swagger respondiendo                                                                                                                                                 |
+| 1    | Cumplida | Pruebas e2e del backend; pentest A1–A8, C1–C9 y G1 (Argon2id, MFA TOTP con antirreúso, sesiones revocables, denegación predeterminada)                                                                               |
+| 2    | Cumplida | Pentest F1–F4: archivo cifrado sin texto plano, alteración de 1 byte detectada, SHA-256 verificado, sin claves en metadatos; límites de carga E1–E4                                                                  |
+| 3    | Cumplida | Pentest A3, B1–B4 y D1–D6; CSP ampliada sin violaciones en Chrome; TLS y cabeceras en [laboratorios](../infra/labs/README.md)                                                                                        |
+| 4    | Cumplida | CI con Trivy; Trivy local sin hallazgos HIGH/CRITICAL; `npm audit` de producción en 0; [informe de pentesting](informe-pentesting.md) con alcance, resultados y remediación                                          |
+| 5    | Cumplida | VLAN, disponibilidad, TLS, Wireshark y WPA2 (radios simuladas) en [laboratorios](../infra/labs/README.md). WPA2 no se probó con un AP físico                                                                         |
+| 6    | Cumplida | Recorrido completo en Chrome (`frontend/tests/integration/portal.mjs`) aprobado sobre base vacía; auditoría sin secretos (pentest J1); [manual de uso](manual-uso.md) y [guía de sustentación](guia-sustentacion.md) |
+
+Riesgos residuales y mejoras propuestas: ver la sección 5 del [informe de pentesting](informe-pentesting.md#5-hallazgos-y-remediación).
+
+## Plan original
 
 | Fase | Alcance previsto                                                             | Criterios de aceptación                                                                                                                                                                           |
 | ---- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

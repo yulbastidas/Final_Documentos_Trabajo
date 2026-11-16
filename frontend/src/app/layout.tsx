@@ -4,7 +4,7 @@ import './interface.css';
 export const metadata: Metadata = {
   title: 'SecureDocs | Gestión documental segura',
   description:
-    'Frontend universitario de gestión documental. Demostración con datos sintéticos e integración de seguridad pendiente.',
+    'Gestión documental segura: identidad con MFA, documentos cifrados y auditoría. Proyecto universitario con datos sintéticos.',
 };
 export default function RootLayout({
   children,

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DEMO_ENABLED } from '../../lib/demo';
 import { Header } from '../../components/header';
 export default function Page() {
   return (
@@ -15,8 +16,11 @@ export default function Page() {
           <Link className="button" href="/login">
             Volver al acceso
           </Link>
-          <Link className="secondary-button" href="/dashboard">
-            Explorar demostración
+          <Link
+            className="secondary-button"
+            href={DEMO_ENABLED ? '/dashboard' : '/portal'}
+          >
+            {DEMO_ENABLED ? 'Explorar demostración' : 'Ir al portal'}
           </Link>
         </div>
       </main>

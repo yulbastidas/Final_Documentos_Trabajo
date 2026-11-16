@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DEMO_ENABLED } from '../../lib/demo';
 import { Header } from '../../components/header';
 export default function Page() {
   return (
@@ -12,8 +13,11 @@ export default function Page() {
           servidor. No se ha evaluado ningún permiso real en esta demostración.
         </p>
         <div className="button-row">
-          <Link className="button" href="/dashboard">
-            Volver a la demo
+          <Link
+            className="button"
+            href={DEMO_ENABLED ? '/dashboard' : '/portal'}
+          >
+            {DEMO_ENABLED ? 'Volver a la demo' : 'Ir al portal'}
           </Link>
           <Link className="secondary-button" href="/login">
             Ir al acceso
