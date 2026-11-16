@@ -50,21 +50,15 @@ sin ella los respaldos de documentos no se pueden descifrar.
 
 ## 3. Configurar GitHub (una vez)
 
-En _Settings → Environments → production → Variables_:
+Las salidas de Bicep se guardan en [`deploy.env`](deploy.env): `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+`AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_VM_NAME`, `ACR_NAME`, `ACR_LOGIN_SERVER` y
+`PUBLIC_ORIGIN`. Son identificadores, no secretos: el login usa OIDC y la credencial federada solo
+acepta ejecuciones del environment `production` de este repositorio. GitHub crea ese environment la
+primera vez que corre el workflow.
 
-| Variable                | Salida de Bicep     |
-| ----------------------- | ------------------- |
-| `AZURE_CLIENT_ID`       | `githubClientId`    |
-| `AZURE_TENANT_ID`       | `tenantId`          |
-| `AZURE_SUBSCRIPTION_ID` | `subscriptionId`    |
-| `AZURE_RESOURCE_GROUP`  | `resourceGroupName` |
-| `AZURE_VM_NAME`         | `vmName`            |
-| `ACR_NAME`              | `acrName`           |
-| `ACR_LOGIN_SERVER`      | `acrLoginServer`    |
-| `PUBLIC_ORIGIN`         | `publicOrigin`      |
-
-No hay secretos que guardar en GitHub: el login usa OIDC y la credencial federada solo acepta
-ejecuciones del environment `production` de este repositorio.
+Si un administrador del repositorio define variables con esos nombres en
+_Settings → Environments → production → Variables_, tienen prioridad sobre el archivo.
+No hay secretos que guardar en GitHub.
 
 ## 4. Desplegar
 
