@@ -110,8 +110,10 @@ jobs:
       - name: Scan repository configuration and dependencies
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: fs
           scan-ref: .
+          trivyignores: .trivyignore.yaml
           scanners: vuln,misconfig,secret
           severity: HIGH,CRITICAL
           ignore-unfixed: true
@@ -143,6 +145,7 @@ jobs:
       - name: Scan backend image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: ${{ env.ACR_LOGIN_SERVER }}/securedocs-backend:${{ env.DEPLOY_SHA }}
           scanners: vuln
@@ -154,6 +157,7 @@ jobs:
       - name: Scan frontend image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: ${{ env.ACR_LOGIN_SERVER }}/securedocs-frontend:${{ env.DEPLOY_SHA }}
           scanners: vuln
@@ -165,6 +169,7 @@ jobs:
       - name: Scan MySQL image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
           scanners: vuln
@@ -176,6 +181,7 @@ jobs:
       - name: Scan Nginx image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: nginxinc/nginx-unprivileged:1.30-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
           scanners: vuln
@@ -187,6 +193,7 @@ jobs:
       - name: Scan Certbot image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           scan-type: image
           image-ref: certbot/certbot:v5.10.0
           scanners: vuln
