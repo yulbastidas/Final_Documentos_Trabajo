@@ -1,0 +1,196 @@
+# Excepciones de Trivy SOLO para la imagen oficial de MySQL (mysql:8.4.13).
+# Las usa únicamente el paso 'Scan MySQL image' de .github/workflows/deploy-azure.yml.
+# Análisis completo: security/trivy/README.md. Vencen el 2027-02-16: reevaluar o actualizar la imagen.
+vulnerabilities:
+  - id: CVE-2025-61726
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2025-61729
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2025-68121
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-111943
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-25679
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-27145
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-32280
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-32281
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-32283
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-33811
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-33814
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-33818
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-39820
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-39821
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-39822
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-39836
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-42499
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-42504
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-56853
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-56858
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-56859
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-56860
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-56862
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-78667
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-78669
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-97031
+    paths:
+      - usr/local/bin/gosu
+    expired_at: 2027-02-16
+    statement: >-
+      gosu (Go stdlib) solo se ejecuta al arrancar el contenedor para pasar de root al usuario mysql y luego hace exec de mysqld; no abre conexiones de red, TLS, HTTP ni procesa entradas externas, así que estas rutas de código de la biblioteca estándar de Go no son alcanzables. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-27459
+    expired_at: 2027-02-16
+    statement: >-
+      pyOpenSSL: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-44431
+    expired_at: 2027-02-16
+    statement: >-
+      urllib3: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-44432
+    expired_at: 2027-02-16
+    statement: >-
+      urllib3: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-69247
+    expired_at: 2027-02-16
+    statement: >-
+      cryptography: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-69249
+    expired_at: 2027-02-16
+    statement: >-
+      cryptography: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-97687
+    expired_at: 2027-02-16
+    statement: >-
+      urllib3: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.
+  - id: CVE-2026-97689
+    expired_at: 2027-02-16
+    statement: >-
+      urllib3: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.
+  - id: GHSA-537c-gmf6-5ccf
+    expired_at: 2027-02-16
+    statement: >-
+      cryptography: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.
+  - id: GHSA-6q48-6c7w-9gw2
+    expired_at: 2027-02-16
+    statement: >-
+      certifi: Librería de Python empaquetada con MySQL Shell (mysqlsh), herramienta de administración opcional que SecureDocs no ejecuta; mysqld no la carga. MySQL corre en una red Docker interna sin salida a internet ni puertos publicados. Sin imagen oficial corregida a la fecha.

@@ -24,6 +24,8 @@ services:
     build: !reset null
 
   nginx:
+    # Imagen oficial + parches de Alpine (infra/docker/nginx.Dockerfile), publicada en ACR.
+    image: ${NGINX_IMAGE:?Definir NGINX_IMAGE}
     environment:
       DEMO_BLOCK: |
         location = /dashboard { return 404; }

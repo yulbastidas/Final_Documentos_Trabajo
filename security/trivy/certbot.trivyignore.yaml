@@ -1,0 +1,24 @@
+# Excepciones de Trivy SOLO para la imagen certbot/certbot:v5.10.0.
+# Las usa únicamente el paso 'Scan Certbot image' de .github/workflows/deploy-azure.yml.
+# Análisis completo: security/trivy/README.md. Vencen el 2027-02-16: reevaluar o actualizar la imagen.
+vulnerabilities:
+  - id: CVE-2025-47273
+    expired_at: 2027-02-16
+    statement: >-
+      setuptools: Certbot se ejecuta como contenedor efímero (--rm) solo al emitir o renovar el certificado; únicamente se conecta a la API ACME de Let's Encrypt por HTTPS y no recibe conexiones entrantes. v5.10.0 es la última versión publicada y no trae la corrección a la fecha.
+  - id: CVE-2026-114613
+    expired_at: 2027-02-16
+    statement: >-
+      msgpack: Certbot se ejecuta como contenedor efímero (--rm) solo al emitir o renovar el certificado; únicamente se conecta a la API ACME de Let's Encrypt por HTTPS y no recibe conexiones entrantes. v5.10.0 es la última versión publicada y no trae la corrección a la fecha.
+  - id: CVE-2026-97687
+    expired_at: 2027-02-16
+    statement: >-
+      urllib3: Certbot se ejecuta como contenedor efímero (--rm) solo al emitir o renovar el certificado; únicamente se conecta a la API ACME de Let's Encrypt por HTTPS y no recibe conexiones entrantes. v5.10.0 es la última versión publicada y no trae la corrección a la fecha.
+  - id: CVE-2026-97689
+    expired_at: 2027-02-16
+    statement: >-
+      urllib3: Certbot se ejecuta como contenedor efímero (--rm) solo al emitir o renovar el certificado; únicamente se conecta a la API ACME de Let's Encrypt por HTTPS y no recibe conexiones entrantes. v5.10.0 es la última versión publicada y no trae la corrección a la fecha.
+  - id: GHSA-6v7p-g79w-8964
+    expired_at: 2027-02-16
+    statement: >-
+      msgpack: Certbot se ejecuta como contenedor efímero (--rm) solo al emitir o renovar el certificado; únicamente se conecta a la API ACME de Let's Encrypt por HTTPS y no recibe conexiones entrantes. v5.10.0 es la última versión publicada y no trae la corrección a la fecha.

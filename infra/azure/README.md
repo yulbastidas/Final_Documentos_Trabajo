@@ -4,19 +4,20 @@ Alternativa a `infra/aws/` para la suscripción **Azure for Students**. Mantiene
 una VM con Docker Compose, Nginx como único servicio expuesto (80 → 443), MySQL y documentos
 cifrados en volúmenes locales, certificado de Let's Encrypt y despliegue desde GitHub Actions.
 
-| AWS (`infra/aws`)                  | Azure (`infra/azure`)                                                   |
-| ---------------------------------- | ----------------------------------------------------------------------- |
-| CloudFormation `securedocs.yaml`   | Bicep `main.bicep`                                                      |
-| EC2 Amazon Linux + EBS cifrado     | VM Ubuntu 24.04 (Trusted Launch) + disco administrado cifrado en reposo |
-| Elastic IP + dominio propio        | IP pública estática + `<label>.<region>.cloudapp.azure.com`             |
-| Security Group 80/443              | NSG 80/443 (22 cerrado)                                                 |
-| SSM Parameter Store                | Key Vault (RBAC)                                                        |
-| ECR                                | Azure Container Registry (Basic, sin usuario admin)                     |
-| SSM Run Command                    | `az vm run-command` (sin SSH)                                           |
-| Rol IAM con OIDC de GitHub         | Identidad administrada con credencial federada de GitHub                |
-| S3 (respaldos)                     | Blob Storage sin claves compartidas, retención 35 días                  |
-| CloudWatch                         | Registros locales con rotación + chequeo de salud con autorreinicio     |
-| `.github/workflows/deploy-aws.yml` | `.github/workflows/deploy-azure.yml`                                    |
+| AWS (`infra/aws`)                  | Azure (`infra/azure`)                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| CloudFormation `securedocs.yaml`   | Bicep `main.bicep`                                                                         |
+| EC2 Amazon Linux + EBS cifrado     | VM Ubuntu 24.04 (Trusted Launch) + disco administrado cifrado en reposo                    |
+| Elastic IP + dominio propio        | IP pública estática + `<label>.<region>.cloudapp.azure.com`                                |
+| Security Group 80/443              | NSG 80/443 (22 cerrado)                                                                    |
+| SSM Parameter Store                | Key Vault (RBAC)                                                                           |
+| ECR                                | Azure Container Registry (Basic, sin usuario admin)                                        |
+| SSM Run Command                    | `az vm run-command` (sin SSH)                                                              |
+| Rol IAM con OIDC de GitHub         | Identidad administrada con credencial federada de GitHub                                   |
+| S3 (respaldos)                     | Blob Storage sin claves compartidas, retención 35 días                                     |
+| CloudWatch                         | Registros locales con rotación + chequeo de salud con autorreinicio                        |
+| `.github/workflows/deploy-aws.yml` | `.github/workflows/deploy-azure.yml`                                                       |
+| Nginx oficial                      | Nginx oficial + parches de Alpine (`infra/docker/nginx.Dockerfile`), ver `security/trivy/` |
 
 Costo aproximado: VM `Standard_B2als_v2` ≈ USD 30/mes, ACR Basic ≈ USD 5/mes, IP y disco ≈ USD 6/mes.
 Para no gastar crédito cuando no se use: `az vm deallocate -g securedocs-prod -n securedocs-vm`
@@ -71,10 +72,17 @@ Rollback: ejecutar el workflow con `release_sha` de un commit anterior de `main`
 
 ## 5. Crear el primer administrador
 
+`az vm run-command` entrega los parámetros como variables `nombre=valor`. La contraseña va en
+`--protected-parameters` para que Azure no la guarde ni la muestre en el estado del comando:
+
 ```powershell
-az vm run-command invoke -g securedocs-prod -n securedocs-vm --command-id RunShellScript `
-  --scripts 'ADMIN_EMAIL="$1" ADMIN_NAME="$2" ADMIN_PASSWORD="$3" bash /usr/local/sbin/securedocs-create-admin' `
-  --parameters <correo> "<nombre>" "<contraseña temporal fuerte>"
+az vm run-command create -g securedocs-prod --vm-name securedocs-vm --name create-admin `
+  --script 'ADMIN_EMAIL="$email" ADMIN_NAME="$name" ADMIN_PASSWORD="$password" bash /usr/local/sbin/securedocs-create-admin' `
+  --parameters email=<correo> name=<nombre> --protected-parameters password=<contraseña-temporal> `
+  --async-execution false
+az vm run-command show -g securedocs-prod --vm-name securedocs-vm --name create-admin --instance-view `
+  --query instanceView.output -o tsv
+az vm run-command delete -g securedocs-prod --vm-name securedocs-vm --name create-admin --yes
 ```
 
 Al entrar por primera vez, active MFA y cambie la contraseña temporal.
