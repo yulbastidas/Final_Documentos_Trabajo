@@ -45,7 +45,9 @@ git -C "$repo" checkout --detach "$commit"
 az login --identity --output none
 
 cd "$repo"
-install -d -m 0700 .secrets infra/tls
+install -d -m 0700 .secrets
+# Nginx runs as UID/GID 101 and mounts this directory: it must be able to enter it.
+install -d -m 0750 -o root -g 101 infra/tls
 install -d -m 0755 .certbot/webroot
 for name in mysql-password mysql-root-password document-kek mfa-encryption-key csrf-secret; do
   az keyvault secret show --vault-name "$KEY_VAULT_NAME" --name "$name" \
@@ -62,7 +64,15 @@ if ! az keyvault secret show --vault-name "$KEY_VAULT_NAME" --name document-kek-
   : > .secrets/document_kek_previous
 fi
 rm -f .secrets/parameter-error
-chmod 0600 .secrets/document_kek_previous
+# Compose bind-mounts these files with their host ownership. The API runs as
+# UID/GID 1000 (node), so its secrets are root:1000 0440; MySQL reads its files
+# as root before dropping privileges, so the root password stays root-only.
+chown root:root .secrets/*
+chmod 0400 .secrets/*
+for name in mysql_password document_kek document_kek_previous mfa_encryption_key csrf_secret; do
+  chgrp 1000 ".secrets/${name}"
+  chmod 0440 ".secrets/${name}"
+done
 
 cat > .env <<EOF
 PUBLIC_ORIGIN=${public_origin}
