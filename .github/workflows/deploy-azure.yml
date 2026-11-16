@@ -1,0 +1,235 @@
+name: Desplegar SecureDocs en Azure
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Commit SHA from main; use a retained ACR tag to roll back.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: securedocs-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DEPLOY_SHA: ${{ inputs.release_sha || github.sha }}
+      RELEASE_SHA_INPUT: ${{ inputs.release_sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Load deployment configuration
+        shell: bash
+        env:
+          GITHUB_VARS: ${{ toJSON(vars) }}
+        run: |
+          set -euo pipefail
+          # Non-secret identifiers from infra/azure/deploy.env; GitHub variables override them.
+          allowed='^(AZURE_CLIENT_ID|AZURE_TENANT_ID|AZURE_SUBSCRIPTION_ID|AZURE_RESOURCE_GROUP|AZURE_VM_NAME|ACR_NAME|ACR_LOGIN_SERVER|PUBLIC_ORIGIN)$'
+          while IFS='=' read -r key value; do
+            [[ -z "$key" || "$key" == \#* ]] && continue
+            [[ "$key" =~ $allowed ]] || { echo "Unexpected key in deploy.env: $key" >&2; exit 1; }
+            override="$(jq -r --arg k "$key" '.[$k] // empty' <<<"$GITHUB_VARS")"
+            value="${override:-$value}"
+            [[ "$value" =~ ^[A-Za-z0-9.:/_()-]+$ ]] || { echo "Invalid value for $key" >&2; exit 1; }
+            echo "${key}=${value}" >> "$GITHUB_ENV"
+          done < <(tr -d '\r' < infra/azure/deploy.env)
+
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$AZURE_CLIENT_ID" =~ ^[0-9a-f-]{36}$ ]]
+          [[ "$AZURE_TENANT_ID" =~ ^[0-9a-f-]{36}$ ]]
+          [[ "$AZURE_SUBSCRIPTION_ID" =~ ^[0-9a-f-]{36}$ ]]
+          [[ "$AZURE_RESOURCE_GROUP" =~ ^[A-Za-z0-9._()-]+$ ]]
+          [[ "$AZURE_VM_NAME" =~ ^[A-Za-z0-9-]+$ ]]
+          [[ "$ACR_NAME" =~ ^[a-z0-9]{5,50}$ ]]
+          [[ "$ACR_LOGIN_SERVER" == "${ACR_NAME}.azurecr.io" ]]
+          [[ "$PUBLIC_ORIGIN" =~ ^https://[a-zA-Z0-9.-]+$ ]]
+          [[ "$DEPLOY_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git fetch --depth=1000 origin main
+          git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and check types
+        run: |
+          npm run build
+          npm run check
+
+      - name: Run unit and backend integration tests
+        run: |
+          npm run test:unit -w frontend
+          npm run test:unit -w backend
+          npm run test:e2e -w backend
+
+      - name: Install browser for frontend E2E tests
+        run: npx playwright install --with-deps chrome
+
+      - name: Run frontend E2E tests
+        run: npm run test:e2e -w frontend
+
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
+
+      - name: Login to Azure with GitHub OIDC
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Scan repository configuration and dependencies
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Build production images
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_exists() { az acr repository show --name "$ACR_NAME" --image "$1:$DEPLOY_SHA" --output none >/dev/null 2>&1; }
+          if image_exists securedocs-backend; then
+            docker pull "${ACR_LOGIN_SERVER}/securedocs-backend:${DEPLOY_SHA}"
+          else
+            [[ -z "$RELEASE_SHA_INPUT" ]] || { echo 'Rollback image is no longer retained in ACR.' >&2; exit 1; }
+            docker build --pull -f infra/docker/backend.Dockerfile -t "${ACR_LOGIN_SERVER}/securedocs-backend:${DEPLOY_SHA}" .
+          fi
+          if image_exists securedocs-frontend; then
+            docker pull "${ACR_LOGIN_SERVER}/securedocs-frontend:${DEPLOY_SHA}"
+          else
+            [[ -z "$RELEASE_SHA_INPUT" ]] || { echo 'Rollback image is no longer retained in ACR.' >&2; exit 1; }
+            docker build --pull -f infra/docker/frontend.Dockerfile \
+              --build-arg "NEXT_PUBLIC_API_URL=${PUBLIC_ORIGIN}/api/v1" \
+              -t "${ACR_LOGIN_SERVER}/securedocs-frontend:${DEPLOY_SHA}" .
+          fi
+          docker pull mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+          docker pull nginxinc/nginx-unprivileged:1.30-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+          docker pull certbot/certbot:v5.10.0
+
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.ACR_LOGIN_SERVER }}/securedocs-backend:${{ env.DEPLOY_SHA }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.ACR_LOGIN_SERVER }}/securedocs-frontend:${{ env.DEPLOY_SHA }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan MySQL image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan Nginx image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: nginxinc/nginx-unprivileged:1.30-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan Certbot image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: certbot/certbot:v5.10.0
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Push immutable images to ACR
+        shell: bash
+        run: |
+          set -euo pipefail
+          for repo in securedocs-backend securedocs-frontend; do
+            az acr repository show --name "$ACR_NAME" --image "$repo:$DEPLOY_SHA" --output none >/dev/null 2>&1 ||
+              docker push "${ACR_LOGIN_SERVER}/${repo}:${DEPLOY_SHA}"
+          done
+
+      - name: Deploy with Run Command and verify readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Positional parameters avoid interpolating values into the remote script.
+          output="$(az vm run-command invoke \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_VM_NAME" \
+            --command-id RunShellScript \
+            --scripts 'r=/opt/securedocs/repo; { git -C "$r" fetch --depth=1000 origin main && git -C "$r" merge-base --is-ancestor "$1" origin/main && git -C "$r" checkout --detach "$1" && bash "$r/infra/azure/securedocs-deploy.sh" "$1" "$2" "$3" "$4"; } 2>&1; echo "SECUREDOCS_EXIT=$?"' \
+            --parameters "$DEPLOY_SHA" \
+              "${ACR_LOGIN_SERVER}/securedocs-backend:${DEPLOY_SHA}" \
+              "${ACR_LOGIN_SERVER}/securedocs-frontend:${DEPLOY_SHA}" \
+              "$PUBLIC_ORIGIN" \
+            --query 'value[0].message' --output tsv)"
+          printf '%s\n' "$output"
+          if grep -q '^SECUREDOCS_EXIT=0$' <<<"$output"; then
+            echo "Deployed ${DEPLOY_SHA}; HTTPS readiness passed on the VM."
+          else
+            echo 'Azure deployment failed; see the VM output above.' >&2
+            exit 1
+          fi
+
+      - name: Verify public HTTPS endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 15 --output /dev/null "${PUBLIC_ORIGIN}/api/v1/health/ready"
+          echo "${PUBLIC_ORIGIN} is reachable over HTTPS."
