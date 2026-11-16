@@ -9,7 +9,11 @@ import type { NextConfig } from 'next';
 const dev = process.env.NODE_ENV !== 'production';
 let apiOrigin = '';
 try {
-  apiOrigin = new URL(process.env.NEXT_PUBLIC_API_URL ?? '').origin;
+  // Mismo valor por defecto que src/lib/api/*.ts: si la variable no está
+  // definida (p. ej. en CI), el cliente llama a la API local y la CSP debe permitirlo.
+  apiOrigin = new URL(
+    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1',
+  ).origin;
 } catch {
   apiOrigin = '';
 }
