@@ -11,13 +11,15 @@ source /etc/securedocs/deploy.env
 commit="${1:-}"
 backend_image="${2:-}"
 frontend_image="${3:-}"
-public_origin="${4:-}"
+nginx_image="${4:-}"
+public_origin="${5:-}"
 if [[ ! "$commit" =~ ^[a-f0-9]{40}$ || "$public_origin" != "https://${DOMAIN}" ]]; then
   echo 'SecureDocs deployment arguments are invalid.' >&2
   exit 2
 fi
 [[ "$backend_image" == "${ACR_LOGIN_SERVER}/securedocs-backend:${commit}" ]]
 [[ "$frontend_image" == "${ACR_LOGIN_SERVER}/securedocs-frontend:${commit}" ]]
+[[ "$nginx_image" == "${ACR_LOGIN_SERVER}/securedocs-nginx:${commit}" ]]
 
 [[ -f /etc/securedocs/bootstrap-complete ]] || {
   echo 'VM bootstrap (cloud-init) has not finished yet.' >&2
@@ -29,7 +31,7 @@ if [[ "${SECUREDOCS_DEPLOY_COPY:-}" != 1 ]]; then
   script_copy="$(mktemp /tmp/securedocs-deploy.XXXXXX)"
   cp "$repo/infra/azure/securedocs-deploy.sh" "$script_copy"
   trap 'rm -f "$script_copy"' EXIT
-  SECUREDOCS_DEPLOY_COPY=1 bash "$script_copy" "$commit" "$backend_image" "$frontend_image" "$public_origin"
+  SECUREDOCS_DEPLOY_COPY=1 bash "$script_copy" "$commit" "$backend_image" "$frontend_image" "$nginx_image" "$public_origin"
   exit $?
 fi
 
@@ -71,6 +73,7 @@ MYSQL_USER=securedocs_app
 DOCUMENT_KEK_ID=k1
 BACKEND_IMAGE=${backend_image}
 FRONTEND_IMAGE=${frontend_image}
+NGINX_IMAGE=${nginx_image}
 EOF
 chmod 0600 .env
 
@@ -78,11 +81,11 @@ az acr login --name "$ACR_NAME" --expose-token --query accessToken --output tsv 
   docker login "$ACR_LOGIN_SERVER" --username 00000000-0000-0000-0000-000000000000 --password-stdin
 docker pull "$backend_image"
 docker pull "$frontend_image"
+docker pull "$nginx_image"
 
 # First deployment: Nginx serves only ACME challenges until a certificate exists.
 if [[ ! -s .certbot/live/securedocs/fullchain.pem ]]; then
   bootstrap_compose=(docker compose --env-file .env -f infra/compose.yaml -f infra/compose.azure.yaml -f infra/compose.acme-bootstrap.yaml)
-  "${bootstrap_compose[@]}" pull nginx
   "${bootstrap_compose[@]}" up -d --no-deps nginx
   docker run --rm -v "$PWD/.certbot:/etc/letsencrypt" \
     -v "$PWD/.certbot/webroot:/var/www/certbot" \
@@ -96,7 +99,7 @@ install -o 101 -g 101 -m 0444 .certbot/live/securedocs/fullchain.pem infra/tls/f
 install -o 101 -g 101 -m 0400 .certbot/live/securedocs/privkey.pem infra/tls/privkey.pem
 
 compose=(docker compose --env-file .env -f infra/compose.yaml -f infra/compose.https.yaml -f infra/compose.azure.yaml)
-"${compose[@]}" pull mysql nginx
+"${compose[@]}" pull mysql
 "${compose[@]}" up -d mysql
 "${compose[@]}" run --rm migrate
 "${compose[@]}" up -d backend frontend nginx

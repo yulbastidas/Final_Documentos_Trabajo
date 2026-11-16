@@ -138,8 +138,14 @@ jobs:
               --build-arg "NEXT_PUBLIC_API_URL=${PUBLIC_ORIGIN}/api/v1" \
               -t "${ACR_LOGIN_SERVER}/securedocs-frontend:${DEPLOY_SHA}" .
           fi
+          # Nginx is the only internet-facing service: official image + Alpine security patches.
+          if image_exists securedocs-nginx; then
+            docker pull "${ACR_LOGIN_SERVER}/securedocs-nginx:${DEPLOY_SHA}"
+          else
+            [[ -z "$RELEASE_SHA_INPUT" ]] || { echo 'Rollback image is no longer retained in ACR.' >&2; exit 1; }
+            docker build --pull -f infra/docker/nginx.Dockerfile -t "${ACR_LOGIN_SERVER}/securedocs-nginx:${DEPLOY_SHA}" infra/docker
+          fi
           docker pull mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
-          docker pull nginxinc/nginx-unprivileged:1.30-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
           docker pull certbot/certbot:v5.10.0
 
       - name: Scan backend image
@@ -172,6 +178,8 @@ jobs:
           version: v0.76.2
           scan-type: image
           image-ref: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+          # Scoped, expiring risk acceptance; see security/trivy/README.md.
+          trivyignores: security/trivy/mysql.trivyignore.yaml
           scanners: vuln
           vuln-type: os,library
           severity: HIGH,CRITICAL
@@ -183,7 +191,7 @@ jobs:
         with:
           version: v0.76.2
           scan-type: image
-          image-ref: nginxinc/nginx-unprivileged:1.30-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+          image-ref: ${{ env.ACR_LOGIN_SERVER }}/securedocs-nginx:${{ env.DEPLOY_SHA }}
           scanners: vuln
           vuln-type: os,library
           severity: HIGH,CRITICAL
@@ -196,6 +204,8 @@ jobs:
           version: v0.76.2
           scan-type: image
           image-ref: certbot/certbot:v5.10.0
+          # Scoped, expiring risk acceptance; see security/trivy/README.md.
+          trivyignores: security/trivy/certbot.trivyignore.yaml
           scanners: vuln
           vuln-type: os,library
           severity: HIGH,CRITICAL
@@ -206,7 +216,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for repo in securedocs-backend securedocs-frontend; do
+          for repo in securedocs-backend securedocs-frontend securedocs-nginx; do
             az acr repository show --name "$ACR_NAME" --image "$repo:$DEPLOY_SHA" --output none >/dev/null 2>&1 ||
               docker push "${ACR_LOGIN_SERVER}/${repo}:${DEPLOY_SHA}"
           done
@@ -215,16 +225,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Positional parameters avoid interpolating values into the remote script.
+          # Run Command exports name=value parameters as shell variables, so values
+          # are never interpolated into the remote script text.
           output="$(az vm run-command invoke \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$AZURE_VM_NAME" \
             --command-id RunShellScript \
-            --scripts 'r=/opt/securedocs/repo; { git -C "$r" fetch --depth=1000 origin main && git -C "$r" merge-base --is-ancestor "$1" origin/main && git -C "$r" checkout --detach "$1" && bash "$r/infra/azure/securedocs-deploy.sh" "$1" "$2" "$3" "$4"; } 2>&1; echo "SECUREDOCS_EXIT=$?"' \
-            --parameters "$DEPLOY_SHA" \
-              "${ACR_LOGIN_SERVER}/securedocs-backend:${DEPLOY_SHA}" \
-              "${ACR_LOGIN_SERVER}/securedocs-frontend:${DEPLOY_SHA}" \
-              "$PUBLIC_ORIGIN" \
+            --scripts 'r=/opt/securedocs/repo; { git -C "$r" fetch --depth=1000 origin main && git -C "$r" merge-base --is-ancestor "$commit" origin/main && git -C "$r" checkout --detach "$commit" && bash "$r/infra/azure/securedocs-deploy.sh" "$commit" "$backend" "$frontend" "$nginx" "$origin"; } 2>&1; echo "SECUREDOCS_EXIT=$?"' \
+            --parameters "commit=${DEPLOY_SHA}" \
+              "backend=${ACR_LOGIN_SERVER}/securedocs-backend:${DEPLOY_SHA}" \
+              "frontend=${ACR_LOGIN_SERVER}/securedocs-frontend:${DEPLOY_SHA}" \
+              "nginx=${ACR_LOGIN_SERVER}/securedocs-nginx:${DEPLOY_SHA}" \
+              "origin=${PUBLIC_ORIGIN}" \
             --query 'value[0].message' --output tsv)"
           printf '%s\n' "$output"
           if grep -q '^SECUREDOCS_EXIT=0$' <<<"$output"; then
