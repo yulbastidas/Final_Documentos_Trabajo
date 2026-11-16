@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { DEMO_ENABLED } from '../../lib/demo';
 import { useState, type FormEvent } from 'react';
 import { Header } from '../header';
 import { Notice } from '../ui/primitives';
@@ -87,8 +88,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
               </p>
             </div>
           </div>
-          <Link className="text-link" href="/dashboard">
-            Explorar con datos de demostración →
+          <Link
+            className="text-link"
+            href={DEMO_ENABLED ? '/dashboard' : '/portal'}
+          >
+            {DEMO_ENABLED
+              ? 'Explorar con datos de demostración →'
+              : 'Ir al portal conectado →'}
           </Link>
         </section>
         <section
@@ -224,8 +230,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
             )}
           </div>
           {message && (
-            <Link className="secondary-button block-link" href="/dashboard">
-              Abrir demostración sin autenticación →
+            <Link
+              className="secondary-button block-link"
+              href={DEMO_ENABLED ? '/dashboard' : '/portal'}
+            >
+              {DEMO_ENABLED
+                ? 'Abrir demostración sin autenticación →'
+                : 'Ir al portal conectado →'}
             </Link>
           )}
         </section>

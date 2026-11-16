@@ -51,6 +51,8 @@ El navegador entra por http://localhost:8080. Las migraciones se aplican como ta
 - [Guía de integración frontend–backend](docs/integracion-frontend-backend.md)
 - [GitHub e incorporación](docs/colaboracion.md)
 - [Fases y aceptación](docs/fases.md)
+- [Manual de uso](docs/manual-uso.md)
+- [Informe de pentesting](docs/informe-pentesting.md)
 - [Validación y pendientes](docs/validacion.md)
 - [Inventario actual completo](docs/inventario-actual.md)
 - [Inventario histórico de Fase 0](docs/inventario.md)

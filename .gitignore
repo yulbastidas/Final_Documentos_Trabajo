@@ -19,3 +19,6 @@ uploads/
 storage/
 .DS_Store
 Thumbs.db
+
+# Evidencia local de laboratorios (capturas y registros)
+.lab-output/

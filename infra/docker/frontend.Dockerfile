@@ -12,6 +12,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 # The synthetic /dashboard workspace is for local presentations only. Keep its
 # source in the repository, but exclude the route and fixtures from the public
 # production image rather than relying only on an edge rewrite.
+ENV NEXT_PUBLIC_DEMO_ENABLED=false
 RUN rm -rf frontend/src/app/dashboard \
     frontend/src/components/workspace \
     frontend/src/lib/fixtures.ts

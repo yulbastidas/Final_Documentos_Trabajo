@@ -6,4 +6,4 @@ No versionar .env, claves, certificados privados, capturas con datos personales 
 
 La CI ejecuta compilación, comprobación de tipos, pruebas unitarias existentes, `npm audit` y Trivy para repositorio e imágenes. Los resultados son una señal de revisión, no una certificación. Protege `main` y `developer` con PR obligatorio, revisión y checks requeridos; Git no activa estas reglas por sí solo.
 
-Continúan pendientes el modelo de amenazas acordado por el equipo, validación visual del TLS con certificado público, retención y respaldos verificados de la KEK, pruebas de carga y pentesting autorizado. Ver [docs/fases.md](../docs/fases.md) y [infra/labs/README.md](../infra/labs/README.md).
+El pentesting estructurado del entorno local está en [docs/informe-pentesting.md](../docs/informe-pentesting.md) y se repite con [`pentest/run-pentest.mjs`](pentest/run-pentest.mjs). Continúan pendientes el modelo de amenazas acordado por el equipo, validación visual del TLS con certificado público, retención y respaldos verificados de la KEK y pruebas de carga. Ver [docs/fases.md](../docs/fases.md) y [infra/labs/README.md](../infra/labs/README.md).

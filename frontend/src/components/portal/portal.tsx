@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { DEMO_ENABLED } from '../../lib/demo';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Header } from '../header';
 import { Notice, PageHeading } from '../ui/primitives';
@@ -306,9 +307,11 @@ export function Portal() {
                     : 'Crear cuenta'}
                 </button>
               </form>
-              <Link className="text-link block-link" href="/dashboard">
-                Ver demostración separada →
-              </Link>
+              {DEMO_ENABLED && (
+                <Link className="text-link block-link" href="/dashboard">
+                  Ver demostración separada →
+                </Link>
+              )}
             </section>
           </>
         )}
